@@ -2,5 +2,5 @@
   "name": "openbotkit",
   "version": "0.1.0",
   "description": "Personal assistant data integrations — captures conversations and provides data access",
-  "hooks": "../hooks/hooks.json"
+  "hooks": "./hooks/hooks.json"
 }

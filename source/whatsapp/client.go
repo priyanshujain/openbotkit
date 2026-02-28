@@ -22,7 +22,7 @@ type Client struct {
 
 func NewClient(ctx context.Context, sessionDBPath string) (*Client, error) {
 	container, err := sqlstore.New(ctx, "sqlite3",
-		fmt.Sprintf("file:%s?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)", sessionDBPath),
+		fmt.Sprintf("file:%s?_foreign_keys=on&_journal_mode=WAL&_busy_timeout=5000", sessionDBPath),
 		waLog.Noop,
 	)
 	if err != nil {

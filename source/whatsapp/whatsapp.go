@@ -70,6 +70,10 @@ func (w *WhatsApp) Logout(ctx context.Context) error {
 		return fmt.Errorf("not authenticated")
 	}
 
+	if err := client.Connect(ctx); err != nil {
+		return fmt.Errorf("connect: %w", err)
+	}
+
 	return client.WM().Logout(ctx)
 }
 

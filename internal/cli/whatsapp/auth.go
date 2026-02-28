@@ -11,8 +11,9 @@ import (
 )
 
 var authCmd = &cobra.Command{
-	Use:   "auth",
-	Short: "Manage WhatsApp authentication",
+	Use:        "auth",
+	Short:      "Manage WhatsApp authentication",
+	Deprecated: "use 'obk auth whatsapp' instead",
 }
 
 var authLoginCmd = &cobra.Command{

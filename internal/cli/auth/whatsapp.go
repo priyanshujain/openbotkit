@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/priyanshujain/openbotkit/config"
 	wasrc "github.com/priyanshujain/openbotkit/source/whatsapp"
@@ -59,8 +58,6 @@ var whatsappLogoutCmd = &cobra.Command{
 		if err := w.Logout(ctx); err != nil {
 			return fmt.Errorf("logout failed: %w", err)
 		}
-
-		os.Remove(cfg.WhatsAppSessionDBPath())
 
 		fmt.Println("Logged out of WhatsApp")
 		return nil

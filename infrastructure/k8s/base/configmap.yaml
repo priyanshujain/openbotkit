@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: obk-config
+  namespace: openbotkit
+data:
+  config.yaml: |
+    daemon:
+      mode: worker
+      gmail_sync_period: "15m"
+    gmail:
+      storage:
+        driver: sqlite
+    whatsapp:
+      storage:
+        driver: sqlite
+    memory:
+      storage:
+        driver: sqlite

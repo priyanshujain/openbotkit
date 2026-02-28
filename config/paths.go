@@ -38,3 +38,7 @@ func EnsureDir() error {
 func EnsureSourceDir(sourceName string) error {
 	return os.MkdirAll(SourceDir(sourceName), 0700)
 }
+
+func JobsDBPath() string {
+	return filepath.Join(Dir(), "jobs.db")
+}

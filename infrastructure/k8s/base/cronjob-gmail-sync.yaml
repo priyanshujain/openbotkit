@@ -1,0 +1,42 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: obk-gmail-sync
+  namespace: openbotkit
+spec:
+  schedule: "*/15 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: obk
+              image: openbotkit:latest
+              args: ["gmail", "sync"]
+              env:
+                - name: OBK_CONFIG_DIR
+                  value: /config
+              volumeMounts:
+                - name: config
+                  mountPath: /config/config.yaml
+                  subPath: config.yaml
+                  readOnly: true
+                - name: data
+                  mountPath: /data
+              resources:
+                requests:
+                  memory: "64Mi"
+                  cpu: "50m"
+                limits:
+                  memory: "256Mi"
+                  cpu: "250m"
+          volumes:
+            - name: config
+              configMap:
+                name: obk-config
+            - name: data
+              emptyDir: {}

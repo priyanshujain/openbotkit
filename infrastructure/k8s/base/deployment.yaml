@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: obk-daemon
+  namespace: openbotkit
+  labels:
+    app: obk-daemon
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: obk-daemon
+  template:
+    metadata:
+      labels:
+        app: obk-daemon
+    spec:
+      containers:
+        - name: obk
+          image: openbotkit:latest
+          args: ["daemon", "--mode", "worker"]
+          env:
+            - name: OBK_CONFIG_DIR
+              value: /config
+          volumeMounts:
+            - name: config
+              mountPath: /config/config.yaml
+              subPath: config.yaml
+              readOnly: true
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+      volumes:
+        - name: config
+          configMap:
+            name: obk-config
+        - name: data
+          emptyDir: {}

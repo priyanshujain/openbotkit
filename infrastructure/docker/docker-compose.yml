@@ -1,0 +1,13 @@
+services:
+  obk-daemon:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile
+    environment:
+      - OBK_CONFIG_DIR=/data
+    volumes:
+      - obk-data:/data
+    restart: unless-stopped
+
+volumes:
+  obk-data:

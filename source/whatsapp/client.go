@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waCompanionReg"
 	waStore "go.mau.fi/whatsmeow/store"
@@ -28,8 +28,8 @@ type Client struct {
 }
 
 func NewClient(ctx context.Context, sessionDBPath string) (*Client, error) {
-	container, err := sqlstore.New(ctx, "sqlite3",
-		fmt.Sprintf("file:%s?_foreign_keys=on&_journal_mode=WAL&_busy_timeout=5000", sessionDBPath),
+	container, err := sqlstore.New(ctx, "sqlite",
+		fmt.Sprintf("file:%s?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)", sessionDBPath),
 		waLog.Noop,
 	)
 	if err != nil {

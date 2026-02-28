@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/priyanshujain/openbotkit/config"
+	"github.com/priyanshujain/openbotkit/provider/google"
 	gmailsrc "github.com/priyanshujain/openbotkit/source/gmail"
 	"github.com/spf13/cobra"
 )
@@ -25,10 +26,11 @@ var sendCmd = &cobra.Command{
 		body, _ := cmd.Flags().GetString("body")
 		account, _ := cmd.Flags().GetString("account")
 
-		g := gmailsrc.New(gmailsrc.Config{
-			CredentialsFile: cfg.Gmail.CredentialsFile,
-			TokenDBPath:     cfg.GmailTokenDBPath(),
+		gp := google.New(google.Config{
+			CredentialsFile: cfg.GoogleCredentialsFile(),
+			TokenDBPath:     cfg.GoogleTokenDBPath(),
 		})
+		g := gmailsrc.New(gmailsrc.Config{Provider: gp})
 
 		result, err := g.Send(context.Background(), gmailsrc.ComposeInput{
 			To:      to,

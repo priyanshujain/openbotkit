@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/priyanshujain/openbotkit/source"
 	"github.com/priyanshujain/openbotkit/store"
+	gapi "google.golang.org/api/gmail/v1"
 )
 
 type Gmail struct {
@@ -22,13 +24,7 @@ func (g *Gmail) Name() string {
 }
 
 func (g *Gmail) Status(ctx context.Context, db *store.DB) (*source.Status, error) {
-	tokenStore, err := NewTokenStore(g.cfg.TokenDBPath)
-	if err != nil {
-		return &source.Status{Connected: false}, nil
-	}
-	defer tokenStore.Close()
-
-	accounts, err := tokenStore.ListAccounts()
+	accounts, err := g.cfg.Provider.Accounts(ctx)
 	if err != nil {
 		return &source.Status{Connected: false}, nil
 	}
@@ -44,23 +40,13 @@ func (g *Gmail) Status(ctx context.Context, db *store.DB) (*source.Status, error
 	}, nil
 }
 
-func (g *Gmail) Login(ctx context.Context, email string) error {
-	tokenStore, err := NewTokenStore(g.cfg.TokenDBPath)
-	if err != nil {
-		return fmt.Errorf("open token store: %w", err)
-	}
-	defer tokenStore.Close()
-
-	return Login(ctx, g.cfg.CredentialsFile, email, tokenStore)
-}
-
-func (g *Gmail) resolveAccount(tokenStore *TokenStore, account string) (string, error) {
-	accounts, err := tokenStore.ListAccounts()
+func (g *Gmail) resolveAccount(ctx context.Context, account string) (string, error) {
+	accounts, err := g.cfg.Provider.Accounts(ctx)
 	if err != nil {
 		return "", fmt.Errorf("list accounts: %w", err)
 	}
 	if len(accounts) == 0 {
-		return "", fmt.Errorf("no authenticated accounts; run 'obk gmail auth login' first")
+		return "", fmt.Errorf("no authenticated accounts; run 'obk auth google login' first")
 	}
 
 	if account != "" {
@@ -79,42 +65,40 @@ func (g *Gmail) resolveAccount(tokenStore *TokenStore, account string) (string, 
 }
 
 func (g *Gmail) Send(ctx context.Context, input ComposeInput) (*SendResult, error) {
-	tokenStore, err := NewTokenStore(g.cfg.TokenDBPath)
-	if err != nil {
-		return nil, fmt.Errorf("open token store: %w", err)
-	}
-	defer tokenStore.Close()
-
-	account, err := g.resolveAccount(tokenStore, input.Account)
+	account, err := g.resolveAccount(ctx, input.Account)
 	if err != nil {
 		return nil, err
 	}
 	input.Account = account
 
-	srv, err := authenticate(ctx, g.cfg.CredentialsFile, account, tokenStore)
+	httpClient, err := g.cfg.Provider.Client(ctx, account, []string{gapi.GmailComposeScope})
 	if err != nil {
-		return nil, fmt.Errorf("authenticate %s: %w", account, err)
+		return nil, fmt.Errorf("get client for %s: %w", account, err)
+	}
+
+	srv, err := newGmailService(ctx, httpClient)
+	if err != nil {
+		return nil, err
 	}
 
 	return SendEmail(srv, input, NewRateLimiter())
 }
 
 func (g *Gmail) CreateDraft(ctx context.Context, input ComposeInput) (*DraftResult, error) {
-	tokenStore, err := NewTokenStore(g.cfg.TokenDBPath)
-	if err != nil {
-		return nil, fmt.Errorf("open token store: %w", err)
-	}
-	defer tokenStore.Close()
-
-	account, err := g.resolveAccount(tokenStore, input.Account)
+	account, err := g.resolveAccount(ctx, input.Account)
 	if err != nil {
 		return nil, err
 	}
 	input.Account = account
 
-	srv, err := authenticate(ctx, g.cfg.CredentialsFile, account, tokenStore)
+	httpClient, err := g.cfg.Provider.Client(ctx, account, []string{gapi.GmailComposeScope})
 	if err != nil {
-		return nil, fmt.Errorf("authenticate %s: %w", account, err)
+		return nil, fmt.Errorf("get client for %s: %w", account, err)
+	}
+
+	srv, err := newGmailService(ctx, httpClient)
+	if err != nil {
+		return nil, err
 	}
 
 	return CreateDraft(srv, input, NewRateLimiter())
@@ -125,18 +109,21 @@ func (g *Gmail) Sync(ctx context.Context, db *store.DB, opts SyncOptions) (*Sync
 		return nil, fmt.Errorf("migrate schema: %w", err)
 	}
 
-	tokenStore, err := NewTokenStore(g.cfg.TokenDBPath)
-	if err != nil {
-		return nil, fmt.Errorf("open token store: %w", err)
+	// Default to 7-day window unless full sync or explicit date.
+	if opts.After == "" && !opts.Full {
+		days := opts.DaysWindow
+		if days == 0 {
+			days = 7
+		}
+		opts.After = time.Now().AddDate(0, 0, -days).Format("2006/01/02")
 	}
-	defer tokenStore.Close()
 
-	accounts, err := tokenStore.ListAccounts()
+	accounts, err := g.cfg.Provider.Accounts(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list accounts: %w", err)
 	}
 	if len(accounts) == 0 {
-		return nil, fmt.Errorf("no authenticated accounts; run 'obk gmail auth login' first")
+		return nil, fmt.Errorf("no authenticated accounts; run 'obk auth google login' first")
 	}
 
 	if opts.Account != "" {
@@ -157,9 +144,16 @@ func (g *Gmail) Sync(ctx context.Context, db *store.DB, opts SyncOptions) (*Sync
 	result := &SyncResult{}
 
 	for _, email := range accounts {
-		srv, err := authenticate(ctx, g.cfg.CredentialsFile, email, tokenStore)
+		httpClient, err := g.cfg.Provider.Client(ctx, email, []string{gapi.GmailReadonlyScope})
 		if err != nil {
-			log.Printf("Error authenticating %s: %v", email, err)
+			log.Printf("Error getting client for %s: %v", email, err)
+			result.Errors++
+			continue
+		}
+
+		srv, err := newGmailService(ctx, httpClient)
+		if err != nil {
+			log.Printf("Error creating service for %s: %v", email, err)
 			result.Errors++
 			continue
 		}

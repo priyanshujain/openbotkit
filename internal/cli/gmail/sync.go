@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/priyanshujain/openbotkit/config"
+	"github.com/priyanshujain/openbotkit/provider/google"
 	gmailsrc "github.com/priyanshujain/openbotkit/source/gmail"
 	"github.com/priyanshujain/openbotkit/store"
 	"github.com/spf13/cobra"
@@ -33,14 +34,20 @@ var syncCmd = &cobra.Command{
 		account, _ := cmd.Flags().GetString("account")
 		full, _ := cmd.Flags().GetBool("full")
 		after, _ := cmd.Flags().GetString("after")
+		days, _ := cmd.Flags().GetInt("days")
 		dlAttachments, _ := cmd.Flags().GetBool("download-attachments")
 
 		attachDir := filepath.Join(config.SourceDir("gmail"), "attachments")
 
-		g := gmailsrc.New(gmailsrc.Config{
-			CredentialsFile: cfg.Gmail.CredentialsFile,
-			TokenDBPath:     cfg.GmailTokenDBPath(),
+		if err := config.EnsureProviderDir("google"); err != nil {
+			return fmt.Errorf("create provider dir: %w", err)
+		}
+
+		gp := google.New(google.Config{
+			CredentialsFile: cfg.GoogleCredentialsFile(),
+			TokenDBPath:     cfg.GoogleTokenDBPath(),
 		})
+		g := gmailsrc.New(gmailsrc.Config{Provider: gp})
 
 		ctx := context.Background()
 		result, err := g.Sync(ctx, db, gmailsrc.SyncOptions{
@@ -49,6 +56,7 @@ var syncCmd = &cobra.Command{
 			Account:             account,
 			DownloadAttachments: dlAttachments || cfg.Gmail.DownloadAttachments,
 			AttachmentsDir:      attachDir,
+			DaysWindow:          days,
 		})
 		if err != nil {
 			return fmt.Errorf("sync failed: %w", err)
@@ -67,5 +75,6 @@ func init() {
 	syncCmd.Flags().String("account", "", "Sync only this account")
 	syncCmd.Flags().Bool("full", false, "Re-fetch everything (ignore existing)")
 	syncCmd.Flags().String("after", "", "Only sync emails after this date (YYYY/MM/DD)")
+	syncCmd.Flags().Int("days", 7, "Number of days to sync (default 7, 0 for all)")
 	syncCmd.Flags().Bool("download-attachments", false, "Save attachments to disk")
 }

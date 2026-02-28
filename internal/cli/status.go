@@ -7,6 +7,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/priyanshujain/openbotkit/config"
+	"github.com/priyanshujain/openbotkit/provider/google"
 	"github.com/priyanshujain/openbotkit/source"
 	gmailsrc "github.com/priyanshujain/openbotkit/source/gmail"
 	memorysrc "github.com/priyanshujain/openbotkit/source/memory"
@@ -24,10 +25,11 @@ var statusCmd = &cobra.Command{
 			return fmt.Errorf("load config: %w", err)
 		}
 
-		g := gmailsrc.New(gmailsrc.Config{
-			CredentialsFile: cfg.Gmail.CredentialsFile,
-			TokenDBPath:     cfg.GmailTokenDBPath(),
+		gp := google.New(google.Config{
+			CredentialsFile: cfg.GoogleCredentialsFile(),
+			TokenDBPath:     cfg.GoogleTokenDBPath(),
 		})
+		g := gmailsrc.New(gmailsrc.Config{Provider: gp})
 		source.Register(g)
 
 		wa := wasrc.New(wasrc.Config{

@@ -1,4 +1,4 @@
-package whatsapp
+package auth
 
 import (
 	"context"
@@ -10,12 +10,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var authCmd = &cobra.Command{
-	Use:   "auth",
+var whatsappCmd = &cobra.Command{
+	Use:   "whatsapp",
 	Short: "Manage WhatsApp authentication",
 }
 
-var authLoginCmd = &cobra.Command{
+var whatsappLoginCmd = &cobra.Command{
 	Use:   "login",
 	Short: "Authenticate WhatsApp by scanning a QR code",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -42,7 +42,7 @@ var authLoginCmd = &cobra.Command{
 	},
 }
 
-var authLogoutCmd = &cobra.Command{
+var whatsappLogoutCmd = &cobra.Command{
 	Use:   "logout",
 	Short: "Disconnect and clear WhatsApp session",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -60,7 +60,6 @@ var authLogoutCmd = &cobra.Command{
 			return fmt.Errorf("logout failed: %w", err)
 		}
 
-		// Remove the session database file.
 		os.Remove(cfg.WhatsAppSessionDBPath())
 
 		fmt.Println("Logged out of WhatsApp")
@@ -68,7 +67,7 @@ var authLogoutCmd = &cobra.Command{
 	},
 }
 
-var authStatusCmd = &cobra.Command{
+var whatsappStatusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Show WhatsApp authentication status",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -96,7 +95,7 @@ var authStatusCmd = &cobra.Command{
 }
 
 func init() {
-	authCmd.AddCommand(authLoginCmd)
-	authCmd.AddCommand(authLogoutCmd)
-	authCmd.AddCommand(authStatusCmd)
+	whatsappCmd.AddCommand(whatsappLoginCmd)
+	whatsappCmd.AddCommand(whatsappLogoutCmd)
+	whatsappCmd.AddCommand(whatsappStatusCmd)
 }

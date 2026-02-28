@@ -9,10 +9,19 @@ import (
 )
 
 type Config struct {
-	Gmail    *GmailConfig    `yaml:"gmail,omitempty"`
-	WhatsApp *WhatsAppConfig `yaml:"whatsapp,omitempty"`
-	Memory   *MemoryConfig   `yaml:"memory,omitempty"`
-	Daemon   *DaemonConfig   `yaml:"daemon,omitempty"`
+	Providers *ProvidersConfig `yaml:"providers,omitempty"`
+	Gmail     *GmailConfig    `yaml:"gmail,omitempty"`
+	WhatsApp  *WhatsAppConfig `yaml:"whatsapp,omitempty"`
+	Memory    *MemoryConfig   `yaml:"memory,omitempty"`
+	Daemon    *DaemonConfig   `yaml:"daemon,omitempty"`
+}
+
+type ProvidersConfig struct {
+	Google *GoogleProviderConfig `yaml:"google,omitempty"`
+}
+
+type GoogleProviderConfig struct {
+	CredentialsFile string `yaml:"credentials_file,omitempty"`
 }
 
 type DaemonConfig struct {
@@ -137,10 +146,6 @@ func (c *Config) GmailDataDSN() string {
 	return filepath.Join(SourceDir("gmail"), "data.db")
 }
 
-func (c *Config) GmailTokenDBPath() string {
-	return filepath.Join(SourceDir("gmail"), "tokens.db")
-}
-
 func (c *Config) WhatsAppDataDSN() string {
 	if c.WhatsApp.Storage.DSN != "" {
 		return c.WhatsApp.Storage.DSN
@@ -165,3 +170,21 @@ func (c *Config) JobsDBDSN() string {
 	}
 	return JobsDBPath()
 }
+
+// GoogleCredentialsFile returns the credentials file path, checking the new
+// providers config first, falling back to the legacy gmail config.
+func (c *Config) GoogleCredentialsFile() string {
+	if c.Providers != nil && c.Providers.Google != nil && c.Providers.Google.CredentialsFile != "" {
+		return c.Providers.Google.CredentialsFile
+	}
+	if c.Gmail != nil && c.Gmail.CredentialsFile != "" {
+		return c.Gmail.CredentialsFile
+	}
+	return filepath.Join(ProviderDir("google"), "credentials.json")
+}
+
+// GoogleTokenDBPath always points to the new provider location.
+func (c *Config) GoogleTokenDBPath() string {
+	return filepath.Join(ProviderDir("google"), "tokens.db")
+}
+

@@ -31,8 +31,8 @@ var configInitCmd = &cobra.Command{
 
 		fmt.Printf("Config created at %s\n", path)
 		fmt.Println("\nNext steps:")
-		fmt.Printf("  1. Place your Google OAuth credentials at %s\n", cfg.Gmail.CredentialsFile)
-		fmt.Println("  2. Run: obk gmail auth login")
+		fmt.Printf("  1. Place your Google OAuth credentials at %s\n", cfg.GoogleCredentialsFile())
+		fmt.Println("  2. Run: obk auth google login --scopes gmail.readonly")
 		return nil
 	},
 }
@@ -70,6 +70,14 @@ var configSetCmd = &cobra.Command{
 		value := args[1]
 
 		switch strings.ToLower(key) {
+		case "providers.google.credentials_file":
+			if cfg.Providers == nil {
+				cfg.Providers = &config.ProvidersConfig{}
+			}
+			if cfg.Providers.Google == nil {
+				cfg.Providers.Google = &config.GoogleProviderConfig{}
+			}
+			cfg.Providers.Google.CredentialsFile = value
 		case "gmail.storage.driver":
 			if value != "sqlite" && value != "postgres" {
 				return fmt.Errorf("invalid driver: %s (must be 'sqlite' or 'postgres')", value)

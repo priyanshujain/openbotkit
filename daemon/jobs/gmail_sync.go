@@ -8,6 +8,7 @@ import (
 	"github.com/riverqueue/river"
 
 	"github.com/priyanshujain/openbotkit/config"
+	"github.com/priyanshujain/openbotkit/provider/google"
 	gmailsrc "github.com/priyanshujain/openbotkit/source/gmail"
 	"github.com/priyanshujain/openbotkit/store"
 )
@@ -33,10 +34,11 @@ func (w *GmailSyncWorker) Work(ctx context.Context, job *river.Job[GmailSyncArgs
 	}
 	defer db.Close()
 
-	g := gmailsrc.New(gmailsrc.Config{
-		CredentialsFile: w.Cfg.Gmail.CredentialsFile,
-		TokenDBPath:     w.Cfg.GmailTokenDBPath(),
+	gp := google.New(google.Config{
+		CredentialsFile: w.Cfg.GoogleCredentialsFile(),
+		TokenDBPath:     w.Cfg.GoogleTokenDBPath(),
 	})
+	g := gmailsrc.New(gmailsrc.Config{Provider: gp})
 
 	result, err := g.Sync(ctx, db, gmailsrc.SyncOptions{
 		DownloadAttachments: w.Cfg.Gmail.DownloadAttachments,

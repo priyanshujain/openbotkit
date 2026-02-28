@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	authcli "github.com/priyanshujain/openbotkit/internal/cli/auth"
 	"github.com/priyanshujain/openbotkit/internal/cli/gmail"
 	memorycli "github.com/priyanshujain/openbotkit/internal/cli/memory"
 	whatsappcli "github.com/priyanshujain/openbotkit/internal/cli/whatsapp"
@@ -28,6 +29,7 @@ var versionCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(authcli.Cmd)
 	rootCmd.AddCommand(daemonCmd)
 	rootCmd.AddCommand(serviceCmd)
 	rootCmd.AddCommand(gmail.Cmd)

@@ -30,6 +30,12 @@ func buildQuery(q FetchQuery) string {
 		}
 		s += "after:" + q.After
 	}
+	if q.Before != "" {
+		if s != "" {
+			s += " "
+		}
+		s += "before:" + q.Before
+	}
 	return s
 }
 

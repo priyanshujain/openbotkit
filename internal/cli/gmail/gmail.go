@@ -10,8 +10,8 @@ var Cmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.AddCommand(authCmd)
 	Cmd.AddCommand(syncCmd)
+	Cmd.AddCommand(fetchCmd)
 	Cmd.AddCommand(emailsCmd)
 	Cmd.AddCommand(attachmentsCmd)
 	Cmd.AddCommand(sendCmd)

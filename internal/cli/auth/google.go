@@ -147,6 +147,7 @@ type scopeChoice struct {
 
 var availableScopeChoices = []scopeChoice{
 	{Label: "Gmail (read)", Scope: "https://www.googleapis.com/auth/gmail.readonly"},
+	{Label: "Gmail (compose + send)", Scope: "https://www.googleapis.com/auth/gmail.compose"},
 	{Label: "Gmail (read + write)", Scope: "https://www.googleapis.com/auth/gmail.modify"},
 	{Label: "Calendar (read)", Scope: "https://www.googleapis.com/auth/calendar.readonly"},
 	{Label: "Calendar (read + write)", Scope: "https://www.googleapis.com/auth/calendar"},
@@ -356,6 +357,7 @@ func init() {
 // scopeAliases maps short names to full Google API scope URLs.
 var scopeAliases = map[string]string{
 	"gmail.readonly":    "https://www.googleapis.com/auth/gmail.readonly",
+	"gmail.compose":     "https://www.googleapis.com/auth/gmail.compose",
 	"gmail.modify":      "https://www.googleapis.com/auth/gmail.modify",
 	"calendar.readonly": "https://www.googleapis.com/auth/calendar.readonly",
 	"calendar":          "https://www.googleapis.com/auth/calendar",

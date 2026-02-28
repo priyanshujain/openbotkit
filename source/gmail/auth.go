@@ -19,7 +19,7 @@ func authenticate(ctx context.Context, credFile string, email string, tokenStore
 		return nil, fmt.Errorf("read credentials file: %w", err)
 	}
 
-	oauthCfg, err := google.ConfigFromJSON(b, gapi.GmailReadonlyScope)
+	oauthCfg, err := google.ConfigFromJSON(b, gapi.GmailReadonlyScope, gapi.GmailComposeScope)
 	if err != nil {
 		return nil, fmt.Errorf("parse credentials: %w", err)
 	}
@@ -57,7 +57,7 @@ func Login(ctx context.Context, credFile string, email string, tokenStore *Token
 		return fmt.Errorf("read credentials file: %w", err)
 	}
 
-	oauthCfg, err := google.ConfigFromJSON(b, gapi.GmailReadonlyScope)
+	oauthCfg, err := google.ConfigFromJSON(b, gapi.GmailReadonlyScope, gapi.GmailComposeScope)
 	if err != nil {
 		return fmt.Errorf("parse credentials: %w", err)
 	}

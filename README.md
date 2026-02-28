@@ -1,91 +1,139 @@
 # OpenBotKit
 
-A safe way to build agentic personal assitant for engineers
+A toolkit for building AI personal assistants through data source integrations.
 
-## Reimbursement CLI
+OpenBotKit (`obk`) serves dual purposes: a **CLI tool** for syncing and querying personal data, and a **Go library** that agent developers can import to build AI assistants.
 
-CLI tool to automate expense reimbursement tracking. Fetches invoices from Gmail, parses financial statements (credit card & bank PDFs), cross-references transactions, and generates a submission-ready reimbursement package.
-
-### How it works
-
-1. **fetch** — Pulls invoice/receipt emails from Gmail via OAuth for configured accounts
-2. **parse** — Extracts transactions from financial statement PDFs (Scapia CC, Axis CC, Axis bank) and dashboard invoices (Freepik) into SQLite
-3. **recon** — Matches email invoices against statement transactions (±5 day window), detects surcharges (rent fees + GST), and stores results in a reconciliation database
-4. **package** — Generates a zip with `reconciled.csv`, unlocked statement PDFs, and invoice attachments ready to submit
-
-### Setup
-
-#### Prerequisites
-
-- Go 1.24+
-- `pdftotext` (from poppler: `brew install poppler`)
-- `qpdf` (for unlocking password-protected PDFs: `brew install qpdf`)
-- Gmail API credentials (`credentials.json`)
-
-#### Configuration
-
-Create `config.yaml`:
-
-```yaml
-pdf_passwords:
-  axis_cc: "YOUR_PASSWORD"
-```
-
-#### Directory structure
-
-```
-files/                         # User-provided input (gitignored contents)
-├── finance/
-│   ├── bank/axis/             # Bank statement PDFs
-│   └── creditcard/
-│       ├── axis/              # Axis CC statement PDFs
-│       └── scapia/            # Scapia CC statement PDFs
-└── source/
-    ├── dashboards/freepik/    # Dashboard invoice PDFs
-    └── offline/officeparty/   # Scanned offline receipts + manifest.csv
-
-data/                          # App-generated (gitignored)
-├── attachments/               # Email attachments
-├── credentials.db             # OAuth tokens
-├── emails.db                  # Fetched emails
-├── statements.db              # Parsed transactions
-└── reconciliation.db          # Reconciliation results
-```
-
-### Usage
+## Install
 
 ```bash
-go build -o reimbursement ./cmd/
-
-# Fetch emails from Gmail
-./reimbursement fetch
-
-# Parse financial statement PDFs
-./reimbursement parse
-
-# Run reconciliation
-./reimbursement recon
-
-# Generate reimbursement package (zip)
-./reimbursement package
+go install github.com/priyanshujain/openbotkit@latest
 ```
 
-### Supported services
+Or build from source:
 
-| Service | Source | Detection |
-|---------|--------|-----------|
-| Claude Code | Anthropic receipts via email | `anthropic.com` sender |
-| GitHub | GitHub payment receipts via email | `noreply@github.com` sender |
-| GoDaddy | Order confirmations via email | `godaddy.com` sender |
-| Freepik | Email invoices + dashboard PDFs | `freepik.com` sender |
-| WeWork | MyHQ/WeWork invoices via email | `myhq.in`, `wework.com` sender |
-| Office Party | Offline scanned receipts | `manifest.csv` in offline dir |
+```bash
+git clone https://github.com/priyanshujain/openbotkit.git
+cd openbotkit
+go build -o obk .
+```
 
-### Reconciliation
+## Quick Start
 
-Transactions are matched across sources:
+```bash
+# Initialize configuration
+obk config init
 
-- **RECONCILED** — confirmed by 2+ sources (e.g. email invoice + CC statement). INR amount taken from statement.
-- **UNRECONCILED** — found in only 1 source. Awaiting additional CC statements or manual entry.
+# Place your Google OAuth credentials
+cp credentials.json ~/.obk/gmail/credentials.json
 
-Axis CC surcharges (Rent Transaction Fee 1% + GST 18%) on WeWork transactions are automatically detected and included as separate line items tied to the parent transaction.
+# Authenticate your Gmail account
+obk gmail auth login
+
+# Sync emails
+obk gmail sync
+
+# List stored emails
+obk gmail emails list
+
+# Search emails
+obk gmail emails search "invoice"
+
+# Check status of all sources
+obk status
+```
+
+## CLI Commands
+
+```
+obk version                          # Print version
+obk status                           # All sources: connected?, items, last sync
+
+obk config init                      # Create default config at ~/.obk/config.yaml
+obk config show                      # Print resolved config
+obk config set <key> <value>         # Set a config value
+obk config path                      # Print config directory
+
+obk gmail auth login                 # OAuth2 browser flow
+obk gmail auth logout [--account]    # Remove stored tokens
+obk gmail auth status                # Show connected accounts
+
+obk gmail sync                       # Incremental sync
+    [--account EMAIL]                # Filter to one account
+    [--full]                         # Re-fetch everything
+    [--after DATE]                   # Only emails after this date
+    [--download-attachments]         # Save attachments to disk
+
+obk gmail emails list                # Paginated list of stored emails
+    [--account EMAIL] [--from ADDR]
+    [--subject TEXT] [--after DATE]
+    [--before DATE] [--limit N]
+    [--json]
+
+obk gmail emails get <message-id>    # Full email details
+    [--json]
+
+obk gmail emails search <query>      # Full-text search
+    [--json]
+
+obk gmail attachments list           # List attachment metadata
+    [--email-id ID] [--json]
+```
+
+## Library Usage
+
+```go
+import (
+    "github.com/priyanshujain/openbotkit/source/gmail"
+    "github.com/priyanshujain/openbotkit/store"
+)
+
+// Open database
+db, _ := store.Open(store.SQLiteConfig("gmail.db"))
+gmail.Migrate(db)
+
+// Create Gmail source
+g := gmail.New(gmail.Config{
+    CredentialsFile: "credentials.json",
+    TokenDBPath:     "tokens.db",
+})
+
+// Sync emails
+result, _ := g.Sync(ctx, db, gmail.SyncOptions{Full: false})
+
+// Query stored emails
+emails, _ := gmail.ListEmails(db, gmail.ListOptions{
+    From:  "someone@example.com",
+    Limit: 10,
+})
+```
+
+## Configuration
+
+Config lives at `~/.obk/config.yaml` (override with `OBK_CONFIG_DIR`):
+
+```yaml
+gmail:
+  credentials_file: ~/.obk/gmail/credentials.json
+  download_attachments: false
+  storage:
+    driver: sqlite    # or "postgres"
+    dsn: ""           # postgres DSN; sqlite path auto-derived
+```
+
+## Data Directory
+
+```
+~/.obk/
+├── config.yaml
+└── gmail/
+    ├── credentials.json    # Google OAuth client creds (user provides)
+    ├── tokens.db           # OAuth tokens (always local SQLite)
+    ├── data.db             # Email data (when using SQLite)
+    └── attachments/        # Downloaded attachments
+```
+
+## Prerequisites
+
+- Go 1.24+
+- Gmail API credentials ([Google Cloud Console](https://console.cloud.google.com/apis/credentials))

@@ -3,129 +3,103 @@ package config
 import (
 	"fmt"
 	"os"
-	"time"
+	"path/filepath"
 
-	"github.com/priyanshujain/reimbursement/parser"
-	"github.com/priyanshujain/reimbursement/recon"
 	"gopkg.in/yaml.v3"
 )
 
+// Config is the root configuration for obk.
 type Config struct {
-	Accounts         []string            `yaml:"accounts"`
-	AfterDate        string              `yaml:"after_date"`
-	Services         []ServiceConfig     `yaml:"services"`
-	FinancialSources []FinancialSource   `yaml:"financial_sources"`
-	DashboardSources []DashboardSource   `yaml:"dashboard_sources"`
-	PDFPasswords     map[string]string   `yaml:"pdf_passwords"`
+	Gmail *GmailConfig `yaml:"gmail,omitempty"`
 }
 
-type ServiceConfig struct {
-	Name             string            `yaml:"name"`
-	AfterDate        string            `yaml:"after_date"`
-	EmailParser      string            `yaml:"email_parser"`
-	DashboardInvoice string            `yaml:"dashboard_invoice"`
-	OfflineDir       string            `yaml:"offline_dir"`
-	DestPatterns     []string          `yaml:"dest_patterns"`
-	EmailFroms       []string          `yaml:"email_froms"`
-	EmailSubjects    []string          `yaml:"email_subjects"`
-	ExcludeSubjects  []string          `yaml:"exclude_subjects"`
-	Surcharges       []SurchargeConfig `yaml:"surcharges"`
-	Optional         bool              `yaml:"optional"`
+// GmailConfig holds Gmail-specific configuration.
+type GmailConfig struct {
+	CredentialsFile     string        `yaml:"credentials_file,omitempty"`
+	DownloadAttachments bool          `yaml:"download_attachments,omitempty"`
+	Storage             StorageConfig `yaml:"storage,omitempty"`
 }
 
-type SurchargeConfig struct {
-	Pattern    string  `yaml:"pattern"`
-	Percentage float64 `yaml:"percentage"`
-	MaxDays    int     `yaml:"max_days"`
-	GSTRate    float64 `yaml:"gst_rate"`
+// StorageConfig holds database configuration for a source.
+type StorageConfig struct {
+	Driver string `yaml:"driver,omitempty"` // "sqlite" or "postgres"
+	DSN    string `yaml:"dsn,omitempty"`    // postgres DSN; sqlite path auto-derived
 }
 
-type FinancialSource struct {
-	Name     string `yaml:"name"`
-	Parser   string `yaml:"parser"`
-	Glob     string `yaml:"glob"`
-	Password string `yaml:"password"` // key into PDFPasswords
+// Load reads the config file from the default location.
+func Load() (*Config, error) {
+	return LoadFrom(FilePath())
 }
 
-type DashboardSource struct {
-	Name   string `yaml:"name"`
-	Parser string `yaml:"parser"`
-	Glob   string `yaml:"glob"`
-}
-
-func Load(path string) (*Config, error) {
+// LoadFrom reads the config file from the given path.
+func LoadFrom(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return Default(), nil
+		}
 		return nil, fmt.Errorf("read config: %w", err)
 	}
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
+	cfg.applyDefaults()
 	return &cfg, nil
 }
 
-// BuildServices resolves service configs into recon.Service values using the parser registry.
-func BuildServices(cfg *Config) ([]recon.Service, error) {
-	services := make([]recon.Service, 0, len(cfg.Services))
-
-	for _, sc := range cfg.Services {
-		svc := recon.Service{
-			Name:             sc.Name,
-			DestPatterns:     sc.DestPatterns,
-			EmailFroms:       sc.EmailFroms,
-			EmailSubjects:    sc.EmailSubjects,
-			ExcludeSubject:   sc.ExcludeSubjects,
-			DashboardInvoice: sc.DashboardInvoice,
-			OfflineDir:       sc.OfflineDir,
-			Optional:         sc.Optional,
-		}
-
-		// Parse after_date
-		if sc.AfterDate != "" {
-			t, err := time.Parse("2006/01/02", sc.AfterDate)
-			if err != nil {
-				return nil, fmt.Errorf("service %q: parse after_date %q: %w", sc.Name, sc.AfterDate, err)
-			}
-			svc.AfterDate = t
-		}
-
-		// Resolve email parser
-		if sc.EmailParser != "" {
-			p, err := parser.GetEmailParser(sc.EmailParser)
-			if err != nil {
-				return nil, fmt.Errorf("service %q: %w", sc.Name, err)
-			}
-			svc.EmailParser = p
-		}
-
-		// Convert surcharge configs
-		for _, sur := range sc.Surcharges {
-			svc.Surcharges = append(svc.Surcharges, recon.SurchargeRule{
-				Pattern:    sur.Pattern,
-				Percentage: sur.Percentage,
-				MaxDays:    sur.MaxDays,
-				GSTRate:    sur.GSTRate,
-			})
-		}
-
-		services = append(services, svc)
-	}
-
-	return services, nil
+// Save writes the config to the default location.
+func (c *Config) Save() error {
+	return c.SaveTo(FilePath())
 }
 
-// FetchSourcesFromServices deduplicates EmailFroms across all services.
-func FetchSourcesFromServices(services []recon.Service) []string {
-	seen := make(map[string]bool)
-	var sources []string
-	for _, svc := range services {
-		for _, from := range svc.EmailFroms {
-			if !seen[from] {
-				seen[from] = true
-				sources = append(sources, from)
-			}
-		}
+// SaveTo writes the config to the given path.
+func (c *Config) SaveTo(path string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		return fmt.Errorf("create config dir: %w", err)
 	}
-	return sources
+	data, err := yaml.Marshal(c)
+	if err != nil {
+		return fmt.Errorf("marshal config: %w", err)
+	}
+	return os.WriteFile(path, data, 0600)
+}
+
+// Default returns the default configuration.
+func Default() *Config {
+	cfg := &Config{
+		Gmail: &GmailConfig{
+			Storage: StorageConfig{
+				Driver: "sqlite",
+			},
+		},
+	}
+	cfg.applyDefaults()
+	return cfg
+}
+
+func (c *Config) applyDefaults() {
+	if c.Gmail == nil {
+		c.Gmail = &GmailConfig{}
+	}
+	if c.Gmail.Storage.Driver == "" {
+		c.Gmail.Storage.Driver = "sqlite"
+	}
+	if c.Gmail.CredentialsFile == "" {
+		c.Gmail.CredentialsFile = filepath.Join(SourceDir("gmail"), "credentials.json")
+	}
+}
+
+// GmailDataDSN returns the resolved DSN for the Gmail data store.
+func (c *Config) GmailDataDSN() string {
+	if c.Gmail.Storage.DSN != "" {
+		return c.Gmail.Storage.DSN
+	}
+	// Default SQLite path.
+	return filepath.Join(SourceDir("gmail"), "data.db")
+}
+
+// GmailTokenDBPath returns the path to the Gmail token database.
+func (c *Config) GmailTokenDBPath() string {
+	return filepath.Join(SourceDir("gmail"), "tokens.db")
 }

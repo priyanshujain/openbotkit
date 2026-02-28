@@ -87,23 +87,3 @@ type DraftResult struct {
 	MessageID string
 	ThreadID  string
 }
-
-type ComposeInput struct {
-	To      []string
-	Cc      []string
-	Bcc     []string
-	Subject string
-	Body    string
-	Account string
-}
-
-type SendResult struct {
-	MessageID string
-	ThreadID  string
-}
-
-type DraftResult struct {
-	DraftID   string
-	MessageID string
-	ThreadID  string
-}

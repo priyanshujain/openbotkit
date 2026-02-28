@@ -206,6 +206,7 @@ func init() {
 
 	messagesCmd.AddCommand(messagesListCmd)
 	messagesCmd.AddCommand(messagesSearchCmd)
+	messagesCmd.AddCommand(messagesSendCmd)
 
 	chatsListCmd.Flags().Bool("json", false, "Output as JSON")
 	chatsCmd.AddCommand(chatsListCmd)

@@ -34,6 +34,7 @@ var syncCmd = &cobra.Command{
 		account, _ := cmd.Flags().GetString("account")
 		full, _ := cmd.Flags().GetBool("full")
 		after, _ := cmd.Flags().GetString("after")
+		days, _ := cmd.Flags().GetInt("days")
 		dlAttachments, _ := cmd.Flags().GetBool("download-attachments")
 
 		attachDir := filepath.Join(config.SourceDir("gmail"), "attachments")
@@ -55,6 +56,7 @@ var syncCmd = &cobra.Command{
 			Account:             account,
 			DownloadAttachments: dlAttachments || cfg.Gmail.DownloadAttachments,
 			AttachmentsDir:      attachDir,
+			DaysWindow:          days,
 		})
 		if err != nil {
 			return fmt.Errorf("sync failed: %w", err)
@@ -73,5 +75,6 @@ func init() {
 	syncCmd.Flags().String("account", "", "Sync only this account")
 	syncCmd.Flags().Bool("full", false, "Re-fetch everything (ignore existing)")
 	syncCmd.Flags().String("after", "", "Only sync emails after this date (YYYY/MM/DD)")
+	syncCmd.Flags().Int("days", 7, "Number of days to sync (default 7, 0 for all)")
 	syncCmd.Flags().Bool("download-attachments", false, "Save attachments to disk")
 }

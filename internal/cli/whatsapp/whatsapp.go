@@ -10,7 +10,6 @@ var Cmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.AddCommand(authCmd)
 	Cmd.AddCommand(syncCmd)
 	Cmd.AddCommand(messagesCmd)
 	Cmd.AddCommand(chatsCmd)

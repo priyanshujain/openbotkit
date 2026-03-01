@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestAuthPageServesHTML(t *testing.T) {
@@ -191,5 +192,77 @@ func TestAuthPageContainsInstructions(t *testing.T) {
 		if !strings.Contains(authPage, s) {
 			t.Fatalf("expected page to contain instruction %q", s)
 		}
+	}
+}
+
+func TestWaitForHistorySync_QuietPeriod(t *testing.T) {
+	ch := make(chan struct{}, 1)
+	ch <- struct{}{}
+
+	start := time.Now()
+	waitForHistorySync(ch, 5*time.Second, 100*time.Millisecond)
+	elapsed := time.Since(start)
+
+	if elapsed < 100*time.Millisecond || elapsed > 500*time.Millisecond {
+		t.Fatalf("expected ~100ms quiet period, got %v", elapsed)
+	}
+}
+
+func TestWaitForHistorySync_ResetOnMultipleEvents(t *testing.T) {
+	ch := make(chan struct{}, 5)
+	ch <- struct{}{}
+
+	go func() {
+		time.Sleep(80 * time.Millisecond)
+		ch <- struct{}{}
+	}()
+
+	start := time.Now()
+	waitForHistorySync(ch, 5*time.Second, 100*time.Millisecond)
+	elapsed := time.Since(start)
+
+	// First signal at t=0 starts 100ms quiet timer; second at t=80ms resets it.
+	// Should return around t=180ms.
+	if elapsed < 150*time.Millisecond || elapsed > 500*time.Millisecond {
+		t.Fatalf("expected ~180ms (reset quiet period), got %v", elapsed)
+	}
+}
+
+func TestWaitForHistorySync_DeadlineExpires(t *testing.T) {
+	ch := make(chan struct{}, 10)
+	ch <- struct{}{}
+
+	// Keep sending signals so quiet timer never expires
+	stop := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case ch <- struct{}{}:
+				time.Sleep(20 * time.Millisecond)
+			case <-stop:
+				return
+			}
+		}
+	}()
+
+	start := time.Now()
+	waitForHistorySync(ch, 200*time.Millisecond, 5*time.Second)
+	elapsed := time.Since(start)
+	close(stop)
+
+	if elapsed < 180*time.Millisecond || elapsed > 500*time.Millisecond {
+		t.Fatalf("expected ~200ms deadline, got %v", elapsed)
+	}
+}
+
+func TestWaitForHistorySync_NoSignal(t *testing.T) {
+	ch := make(chan struct{})
+
+	start := time.Now()
+	waitForHistorySync(ch, 200*time.Millisecond, 100*time.Millisecond)
+	elapsed := time.Since(start)
+
+	if elapsed < 180*time.Millisecond || elapsed > 500*time.Millisecond {
+		t.Fatalf("expected ~200ms deadline (no signal), got %v", elapsed)
 	}
 }

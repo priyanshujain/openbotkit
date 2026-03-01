@@ -3,12 +3,14 @@ package gmail
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"golang.org/x/time/rate"
 	gapi "google.golang.org/api/gmail/v1"
+	"google.golang.org/api/googleapi"
 )
 
 // 15 req/s stays well within the 250 quota-units/sec Gmail API budget.
@@ -128,6 +130,63 @@ func parseParts(srv *gapi.Service, msgID string, part *gapi.MessagePart, email *
 	for _, sub := range part.Parts {
 		parseParts(srv, msgID, sub, email, limiter)
 	}
+}
+
+var errHistoryExpired = errors.New("history ID expired")
+
+func isHistoryExpired(err error) bool {
+	var apiErr *googleapi.Error
+	if errors.As(err, &apiErr) && apiErr.Code == 404 {
+		return true
+	}
+	return false
+}
+
+func GetProfile(srv *gapi.Service, limiter *rate.Limiter) (uint64, error) {
+	limiter.Wait(context.Background())
+	profile, err := srv.Users.GetProfile("me").Do()
+	if err != nil {
+		return 0, fmt.Errorf("get profile: %w", err)
+	}
+	return profile.HistoryId, nil
+}
+
+func FetchHistoryIDs(srv *gapi.Service, startHistoryID uint64, limiter *rate.Limiter) ([]string, uint64, error) {
+	var ids []string
+	var newHistoryID uint64
+	pageToken := ""
+
+	for {
+		limiter.Wait(context.Background())
+		req := srv.Users.History.List("me").StartHistoryId(startHistoryID).HistoryTypes("messageAdded")
+		if pageToken != "" {
+			req.PageToken(pageToken)
+		}
+		res, err := req.Do()
+		if err != nil {
+			if isHistoryExpired(err) {
+				return nil, 0, errHistoryExpired
+			}
+			return nil, 0, fmt.Errorf("list history: %w", err)
+		}
+
+		newHistoryID = res.HistoryId
+		seen := make(map[string]bool)
+		for _, h := range res.History {
+			for _, m := range h.MessagesAdded {
+				if !seen[m.Message.Id] {
+					ids = append(ids, m.Message.Id)
+					seen[m.Message.Id] = true
+				}
+			}
+		}
+
+		if res.NextPageToken == "" {
+			break
+		}
+		pageToken = res.NextPageToken
+	}
+	return ids, newHistoryID, nil
 }
 
 func parseDate(s string) (time.Time, error) {

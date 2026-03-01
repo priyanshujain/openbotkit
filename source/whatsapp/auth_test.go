@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestAuthPageServesHTML(t *testing.T) {
@@ -42,6 +43,7 @@ func TestQREndpointReturnsJSON(t *testing.T) {
 	var mu sync.Mutex
 	currentQR := "test-qr-code-data"
 	linking := false
+	syncing := false
 	authenticated := false
 
 	mux := http.NewServeMux()
@@ -50,6 +52,7 @@ func TestQREndpointReturnsJSON(t *testing.T) {
 		resp := map[string]any{
 			"qr":            currentQR,
 			"linking":       linking,
+			"syncing":       syncing,
 			"authenticated": authenticated,
 		}
 		mu.Unlock()
@@ -75,6 +78,9 @@ func TestQREndpointReturnsJSON(t *testing.T) {
 	if resp["linking"] != false {
 		t.Fatalf("expected linking=false, got %v", resp["linking"])
 	}
+	if resp["syncing"] != false {
+		t.Fatalf("expected syncing=false, got %v", resp["syncing"])
+	}
 	if resp["authenticated"] != false {
 		t.Fatalf("expected authenticated=false, got %v", resp["authenticated"])
 	}
@@ -84,6 +90,7 @@ func TestQREndpointAuthenticated(t *testing.T) {
 	var mu sync.Mutex
 	currentQR := ""
 	linking := false
+	syncing := false
 	authenticated := true
 
 	mux := http.NewServeMux()
@@ -92,6 +99,7 @@ func TestQREndpointAuthenticated(t *testing.T) {
 		resp := map[string]any{
 			"qr":            currentQR,
 			"linking":       linking,
+			"syncing":       syncing,
 			"authenticated": authenticated,
 		}
 		mu.Unlock()
@@ -113,6 +121,9 @@ func TestQREndpointAuthenticated(t *testing.T) {
 	if resp["linking"] != false {
 		t.Fatalf("expected linking=false when authenticated, got %v", resp["linking"])
 	}
+	if resp["syncing"] != false {
+		t.Fatalf("expected syncing=false when authenticated, got %v", resp["syncing"])
+	}
 	if resp["qr"] != "" {
 		t.Fatalf("expected empty qr when authenticated, got %v", resp["qr"])
 	}
@@ -122,6 +133,7 @@ func TestQREndpointLinking(t *testing.T) {
 	var mu sync.Mutex
 	currentQR := ""
 	linking := true
+	syncing := false
 	authenticated := false
 
 	mux := http.NewServeMux()
@@ -130,6 +142,7 @@ func TestQREndpointLinking(t *testing.T) {
 		resp := map[string]any{
 			"qr":            currentQR,
 			"linking":       linking,
+			"syncing":       syncing,
 			"authenticated": authenticated,
 		}
 		mu.Unlock()
@@ -147,6 +160,9 @@ func TestQREndpointLinking(t *testing.T) {
 	}
 	if resp["linking"] != true {
 		t.Fatalf("expected linking=true, got %v", resp["linking"])
+	}
+	if resp["syncing"] != false {
+		t.Fatalf("expected syncing=false during linking, got %v", resp["syncing"])
 	}
 	if resp["authenticated"] != false {
 		t.Fatalf("expected authenticated=false during linking, got %v", resp["authenticated"])
@@ -191,5 +207,129 @@ func TestAuthPageContainsInstructions(t *testing.T) {
 		if !strings.Contains(authPage, s) {
 			t.Fatalf("expected page to contain instruction %q", s)
 		}
+	}
+}
+
+func TestWaitForHistorySync_QuietPeriod(t *testing.T) {
+	ch := make(chan struct{}, 1)
+	ch <- struct{}{}
+
+	start := time.Now()
+	waitForHistorySync(ch, 5*time.Second, 100*time.Millisecond)
+	elapsed := time.Since(start)
+
+	if elapsed < 100*time.Millisecond || elapsed > 500*time.Millisecond {
+		t.Fatalf("expected ~100ms quiet period, got %v", elapsed)
+	}
+}
+
+func TestWaitForHistorySync_ResetOnMultipleEvents(t *testing.T) {
+	ch := make(chan struct{}, 5)
+	ch <- struct{}{}
+
+	go func() {
+		time.Sleep(80 * time.Millisecond)
+		ch <- struct{}{}
+	}()
+
+	start := time.Now()
+	waitForHistorySync(ch, 5*time.Second, 100*time.Millisecond)
+	elapsed := time.Since(start)
+
+	// First signal at t=0 starts 100ms quiet timer; second at t=80ms resets it.
+	// Should return around t=180ms.
+	if elapsed < 150*time.Millisecond || elapsed > 500*time.Millisecond {
+		t.Fatalf("expected ~180ms (reset quiet period), got %v", elapsed)
+	}
+}
+
+func TestWaitForHistorySync_DeadlineExpires(t *testing.T) {
+	ch := make(chan struct{}, 10)
+	ch <- struct{}{}
+
+	// Keep sending signals so quiet timer never expires
+	stop := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case ch <- struct{}{}:
+				time.Sleep(20 * time.Millisecond)
+			case <-stop:
+				return
+			}
+		}
+	}()
+
+	start := time.Now()
+	waitForHistorySync(ch, 200*time.Millisecond, 5*time.Second)
+	elapsed := time.Since(start)
+	close(stop)
+
+	if elapsed < 180*time.Millisecond || elapsed > 500*time.Millisecond {
+		t.Fatalf("expected ~200ms deadline, got %v", elapsed)
+	}
+}
+
+func TestWaitForHistorySync_NoSignal(t *testing.T) {
+	ch := make(chan struct{})
+
+	start := time.Now()
+	waitForHistorySync(ch, 200*time.Millisecond, 100*time.Millisecond)
+	elapsed := time.Since(start)
+
+	if elapsed < 180*time.Millisecond || elapsed > 500*time.Millisecond {
+		t.Fatalf("expected ~200ms deadline (no signal), got %v", elapsed)
+	}
+}
+
+func TestQREndpointSyncing(t *testing.T) {
+	var mu sync.Mutex
+	currentQR := ""
+	linking := false
+	syncing := true
+	authenticated := false
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/qr", func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		resp := map[string]any{
+			"qr":            currentQR,
+			"linking":       linking,
+			"syncing":       syncing,
+			"authenticated": authenticated,
+		}
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+	})
+
+	req := httptest.NewRequest("GET", "/api/qr", nil)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	var resp map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("parse json: %v", err)
+	}
+	if resp["syncing"] != true {
+		t.Fatalf("expected syncing=true, got %v", resp["syncing"])
+	}
+	if resp["linking"] != false {
+		t.Fatalf("expected linking=false during syncing, got %v", resp["linking"])
+	}
+	if resp["authenticated"] != false {
+		t.Fatalf("expected authenticated=false during syncing, got %v", resp["authenticated"])
+	}
+}
+
+func TestAuthPageContainsSyncingMessage(t *testing.T) {
+	if !strings.Contains(authPage, "Syncing your message history...") {
+		t.Fatal("expected page to show syncing message")
+	}
+	if !strings.Contains(authPage, `id="syncing"`) {
+		t.Fatal("expected page to have a syncing element")
+	}
+	if !strings.Contains(authPage, "d.syncing") {
+		t.Fatal("expected page to handle syncing state in poll")
 	}
 }

@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	"go.mau.fi/whatsmeow/types/events"
 )
 
 const authPage = `<!DOCTYPE html>
@@ -62,6 +64,10 @@ h1{font-size:1.5rem;font-weight:600;margin-bottom:.5rem}
     <p class="loading" style="font-size:1.1rem;font-weight:500">Linking your device, please wait...</p>
     <p class="subtitle" style="margin-top:.75rem;margin-bottom:0">This usually takes 10–15 seconds.</p>
   </div>
+  <div id="syncing" style="display:none">
+    <p class="loading" style="font-size:1.1rem;font-weight:500">Syncing your message history...</p>
+    <p class="subtitle" style="margin-top:.75rem;margin-bottom:0">This usually takes 15–30 seconds.</p>
+  </div>
   <div id="done" style="display:none">
     <div class="success-icon">&#10003;</div>
     <p class="success-msg">WhatsApp linked successfully!</p>
@@ -70,9 +76,11 @@ h1{font-size:1.5rem;font-weight:600;margin-bottom:.5rem}
 </div>
 <script>
 var qrEl=document.getElementById("qr"),statusEl=document.getElementById("status"),
-    mainEl=document.getElementById("main"),linkingEl=document.getElementById("linking"),doneEl=document.getElementById("done"),qrCode=null,hasQR=false;
+    mainEl=document.getElementById("main"),linkingEl=document.getElementById("linking"),
+    syncingEl=document.getElementById("syncing"),doneEl=document.getElementById("done"),qrCode=null,hasQR=false;
 function poll(){fetch("/api/qr").then(function(r){return r.json()}).then(function(d){
-  if(d.authenticated){mainEl.style.display="none";linkingEl.style.display="none";doneEl.style.display="block";return}
+  if(d.authenticated){mainEl.style.display="none";linkingEl.style.display="none";syncingEl.style.display="none";doneEl.style.display="block";return}
+  if(d.syncing){mainEl.style.display="none";linkingEl.style.display="none";syncingEl.style.display="block";setTimeout(poll,2000);return}
   if(d.linking){mainEl.style.display="none";linkingEl.style.display="block";setTimeout(poll,2000);return}
   if(d.qr){hasQR=true;statusEl.textContent="QR code ready — scan it now";statusEl.className="";
     if(!qrCode){qrCode=new QRCode(qrEl,{text:d.qr,width:220,height:220,correctLevel:QRCode.CorrectLevel.L})}
@@ -82,6 +90,33 @@ poll();
 </script>
 </body></html>`
 
+// waitForHistorySync blocks until either the quiet period elapses after the
+// last sync signal, or maxWait is reached. This lets the phone finish its
+// initial history sync before we declare authentication complete.
+func waitForHistorySync(syncSignal <-chan struct{}, maxWait, quietPeriod time.Duration) {
+	deadline := time.After(maxWait)
+	quietTimer := time.NewTimer(quietPeriod)
+	defer quietTimer.Stop()
+
+	select {
+	case <-syncSignal:
+		quietTimer.Reset(quietPeriod)
+	case <-deadline:
+		return
+	}
+
+	for {
+		select {
+		case <-syncSignal:
+			quietTimer.Reset(quietPeriod)
+		case <-quietTimer.C:
+			return
+		case <-deadline:
+			return
+		}
+	}
+}
+
 func ServeQR(ctx context.Context, client *Client, addr string) error {
 	if addr == "" {
 		addr = ":8085"
@@ -90,6 +125,7 @@ func ServeQR(ctx context.Context, client *Client, addr string) error {
 	var mu sync.Mutex
 	var currentQR string
 	linking := false
+	syncing := false
 	authenticated := false
 
 	qrChan := make(chan string, 5)
@@ -118,6 +154,7 @@ func ServeQR(ctx context.Context, client *Client, addr string) error {
 		resp := map[string]any{
 			"qr":            currentQR,
 			"linking":       linking,
+			"syncing":       syncing,
 			"authenticated": authenticated,
 		}
 		mu.Unlock()
@@ -142,14 +179,30 @@ func ServeQR(ctx context.Context, client *Client, addr string) error {
 	port := ln.Addr().(*net.TCPAddr).Port
 	fmt.Printf("Open http://localhost:%d in your browser to scan the QR code\n", port)
 
+	syncSignal := make(chan struct{}, 1)
+	handlerID := client.WM().AddEventHandler(func(rawEvt any) {
+		if _, ok := rawEvt.(*events.HistorySync); ok {
+			select {
+			case syncSignal <- struct{}{}:
+			default:
+			}
+		}
+	})
+
 	connectErr := client.ConnectWithQR(ctx, qrChan)
 
-	// Keep the client connected so the phone can finish the initial key exchange.
-	// WhatsApp needs ~10-15s after QR scan to complete device linking.
-	fmt.Println("Completing device linking, please wait...")
-	time.Sleep(15 * time.Second)
+	// Transition from linking → syncing and wait for initial history sync.
+	mu.Lock()
+	linking = false
+	syncing = true
+	mu.Unlock()
+
+	fmt.Println("Syncing message history, please wait...")
+	waitForHistorySync(syncSignal, 45*time.Second, 10*time.Second)
+	client.WM().RemoveEventHandler(handlerID)
 
 	mu.Lock()
+	syncing = false
 	authenticated = true
 	mu.Unlock()
 

@@ -266,3 +266,55 @@ func TestWaitForHistorySync_NoSignal(t *testing.T) {
 		t.Fatalf("expected ~200ms deadline (no signal), got %v", elapsed)
 	}
 }
+
+func TestQREndpointSyncing(t *testing.T) {
+	var mu sync.Mutex
+	currentQR := ""
+	linking := false
+	syncing := true
+	authenticated := false
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/qr", func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		resp := map[string]any{
+			"qr":            currentQR,
+			"linking":       linking,
+			"syncing":       syncing,
+			"authenticated": authenticated,
+		}
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+	})
+
+	req := httptest.NewRequest("GET", "/api/qr", nil)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	var resp map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("parse json: %v", err)
+	}
+	if resp["syncing"] != true {
+		t.Fatalf("expected syncing=true, got %v", resp["syncing"])
+	}
+	if resp["linking"] != false {
+		t.Fatalf("expected linking=false during syncing, got %v", resp["linking"])
+	}
+	if resp["authenticated"] != false {
+		t.Fatalf("expected authenticated=false during syncing, got %v", resp["authenticated"])
+	}
+}
+
+func TestAuthPageContainsSyncingMessage(t *testing.T) {
+	if !strings.Contains(authPage, "Syncing your message history...") {
+		t.Fatal("expected page to show syncing message")
+	}
+	if !strings.Contains(authPage, `id="syncing"`) {
+		t.Fatal("expected page to have a syncing element")
+	}
+	if !strings.Contains(authPage, "d.syncing") {
+		t.Fatal("expected page to handle syncing state in poll")
+	}
+}

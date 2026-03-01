@@ -28,6 +28,12 @@ CREATE TABLE IF NOT EXISTS gmail_attachments (
 CREATE INDEX IF NOT EXISTS idx_gmail_emails_account ON gmail_emails(account);
 CREATE INDEX IF NOT EXISTS idx_gmail_emails_date ON gmail_emails(date);
 CREATE INDEX IF NOT EXISTS idx_gmail_emails_from ON gmail_emails(from_addr);
+
+CREATE TABLE IF NOT EXISTS gmail_sync_state (
+	account TEXT PRIMARY KEY,
+	history_id INTEGER NOT NULL,
+	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
 `
 
 const schemaPostgres = `
@@ -56,6 +62,12 @@ CREATE TABLE IF NOT EXISTS gmail_attachments (
 CREATE INDEX IF NOT EXISTS idx_gmail_emails_account ON gmail_emails(account);
 CREATE INDEX IF NOT EXISTS idx_gmail_emails_date ON gmail_emails(date);
 CREATE INDEX IF NOT EXISTS idx_gmail_emails_from ON gmail_emails(from_addr);
+
+CREATE TABLE IF NOT EXISTS gmail_sync_state (
+	account TEXT PRIMARY KEY,
+	history_id BIGINT NOT NULL,
+	updated_at TIMESTAMPTZ DEFAULT NOW()
+);
 `
 
 func Migrate(db *store.DB) error {

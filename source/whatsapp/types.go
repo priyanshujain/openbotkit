@@ -23,6 +23,15 @@ type Chat struct {
 	LastMessageAt *time.Time
 }
 
+type Contact struct {
+	JID          string
+	Phone        string
+	FirstName    string
+	FullName     string
+	PushName     string
+	BusinessName string
+}
+
 type Config struct {
 	SessionDBPath string
 }

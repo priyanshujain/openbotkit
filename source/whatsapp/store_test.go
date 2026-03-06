@@ -337,6 +337,199 @@ func TestListChatsEmpty(t *testing.T) {
 	}
 }
 
+func TestSaveContact(t *testing.T) {
+	db := testDB(t)
+	if err := Migrate(db); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	c := &Contact{
+		JID:       "919876543210@s.whatsapp.net",
+		Phone:     "919876543210",
+		FirstName: "John",
+		FullName:  "John Doe",
+		PushName:  "JD",
+	}
+
+	if err := SaveContact(db, c); err != nil {
+		t.Fatalf("save contact: %v", err)
+	}
+
+	got, err := GetContact(db, "919876543210@s.whatsapp.net")
+	if err != nil {
+		t.Fatalf("get contact: %v", err)
+	}
+	if got == nil {
+		t.Fatal("expected contact, got nil")
+	}
+	if got.FullName != "John Doe" {
+		t.Fatalf("expected 'John Doe', got %q", got.FullName)
+	}
+	if got.PushName != "JD" {
+		t.Fatalf("expected 'JD', got %q", got.PushName)
+	}
+}
+
+func TestSaveContactUpsert(t *testing.T) {
+	db := testDB(t)
+	if err := Migrate(db); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	c := &Contact{
+		JID:      "919876543210@s.whatsapp.net",
+		Phone:    "919876543210",
+		FullName: "John Doe",
+		PushName: "JD",
+	}
+	SaveContact(db, c)
+
+	// Upsert with updated push name.
+	c.PushName = "Johnny"
+	if err := SaveContact(db, c); err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+
+	got, _ := GetContact(db, "919876543210@s.whatsapp.net")
+	if got.PushName != "Johnny" {
+		t.Fatalf("expected 'Johnny', got %q", got.PushName)
+	}
+}
+
+func TestSaveContactPreservesNonEmptyFields(t *testing.T) {
+	db := testDB(t)
+	if err := Migrate(db); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	SaveContact(db, &Contact{
+		JID:      "123@s.whatsapp.net",
+		Phone:    "123",
+		FullName: "Alice",
+		PushName: "Ali",
+	})
+
+	// Upsert with empty full_name — should preserve existing.
+	SaveContact(db, &Contact{
+		JID:      "123@s.whatsapp.net",
+		Phone:    "123",
+		FullName: "",
+		PushName: "Ali2",
+	})
+
+	got, _ := GetContact(db, "123@s.whatsapp.net")
+	if got.FullName != "Alice" {
+		t.Fatalf("expected preserved 'Alice', got %q", got.FullName)
+	}
+	if got.PushName != "Ali2" {
+		t.Fatalf("expected 'Ali2', got %q", got.PushName)
+	}
+}
+
+func TestGetContactNotFound(t *testing.T) {
+	db := testDB(t)
+	if err := Migrate(db); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	got, err := GetContact(db, "nonexistent@s.whatsapp.net")
+	if err != nil {
+		t.Fatalf("get contact: %v", err)
+	}
+	if got != nil {
+		t.Fatalf("expected nil, got %+v", got)
+	}
+}
+
+func TestListContacts(t *testing.T) {
+	db := testDB(t)
+	if err := Migrate(db); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	contacts := []*Contact{
+		{JID: "1@s.whatsapp.net", Phone: "1", FullName: "Alice Smith", PushName: "Ali"},
+		{JID: "2@s.whatsapp.net", Phone: "2", FullName: "Bob Jones", PushName: "Bobby"},
+		{JID: "3@s.whatsapp.net", Phone: "3", FullName: "Charlie Brown", PushName: "Chuck"},
+	}
+	for _, c := range contacts {
+		SaveContact(db, c)
+	}
+
+	// List all.
+	results, err := ListContacts(db, "", 50)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(results) != 3 {
+		t.Fatalf("expected 3, got %d", len(results))
+	}
+
+	// Limit.
+	results, err = ListContacts(db, "", 2)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("expected 2, got %d", len(results))
+	}
+}
+
+func TestListContactsSearch(t *testing.T) {
+	db := testDB(t)
+	if err := Migrate(db); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	contacts := []*Contact{
+		{JID: "1@s.whatsapp.net", Phone: "919876543210", FullName: "Alice Smith", PushName: "Ali"},
+		{JID: "2@s.whatsapp.net", Phone: "919999000111", FullName: "Bob Jones", PushName: "Bobby"},
+		{JID: "3@s.whatsapp.net", Phone: "918888777666", FullName: "Charlie Brown", PushName: "Chuck"},
+	}
+	for _, c := range contacts {
+		SaveContact(db, c)
+	}
+
+	// Search by full name.
+	results, err := ListContacts(db, "alice", 50)
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1, got %d", len(results))
+	}
+	if results[0].FullName != "Alice Smith" {
+		t.Fatalf("expected 'Alice Smith', got %q", results[0].FullName)
+	}
+
+	// Search by push name.
+	results, err = ListContacts(db, "bobby", 50)
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1, got %d", len(results))
+	}
+
+	// Search by phone.
+	results, err = ListContacts(db, "919876", 50)
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1, got %d", len(results))
+	}
+
+	// No match.
+	results, err = ListContacts(db, "nonexistent", 50)
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(results) != 0 {
+		t.Fatalf("expected 0, got %d", len(results))
+	}
+}
+
 func TestListChatsDefaultLimit(t *testing.T) {
 	db := testDB(t)
 	if err := Migrate(db); err != nil {

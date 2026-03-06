@@ -83,6 +83,8 @@ func Sync(ctx context.Context, client *Client, db *store.DB, opts SyncOptions) (
 		return nil, fmt.Errorf("connect: %w", err)
 	}
 
+	go syncContacts(ctx, client, db)
+
 	if opts.Follow {
 		<-ctx.Done()
 	} else {
@@ -96,6 +98,27 @@ func Sync(ctx context.Context, client *Client, db *store.DB, opts SyncOptions) (
 		HistoryMessages: int(historyMsgs.Load()),
 		Errors:          int(errors.Load()),
 	}, nil
+}
+
+func syncContacts(ctx context.Context, client *Client, db *store.DB) {
+	// Wait a bit for the connection to stabilize and contacts to load.
+	time.Sleep(5 * time.Second)
+
+	contacts, err := client.GetAllContacts(ctx)
+	if err != nil {
+		log.Printf("sync contacts: %v", err)
+		return
+	}
+
+	var saved int
+	for _, c := range contacts {
+		if err := SaveContact(db, &c); err != nil {
+			log.Printf("save contact %s: %v", c.JID, err)
+			continue
+		}
+		saved++
+	}
+	log.Printf("contacts synced: %d/%d", saved, len(contacts))
 }
 
 func parseMessage(evt *events.Message) *Message {

@@ -175,6 +175,80 @@ func LastSyncTime(db *store.DB) (*time.Time, error) {
 	return nil, nil
 }
 
+func SaveContact(db *store.DB, c *Contact) error {
+	_, err := db.Exec(
+		db.Rebind(`INSERT INTO whatsapp_contacts (jid, phone, first_name, full_name, push_name, business_name, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+			ON CONFLICT(jid) DO UPDATE SET
+				phone = excluded.phone,
+				first_name = CASE WHEN excluded.first_name != '' THEN excluded.first_name ELSE whatsapp_contacts.first_name END,
+				full_name = CASE WHEN excluded.full_name != '' THEN excluded.full_name ELSE whatsapp_contacts.full_name END,
+				push_name = CASE WHEN excluded.push_name != '' THEN excluded.push_name ELSE whatsapp_contacts.push_name END,
+				business_name = CASE WHEN excluded.business_name != '' THEN excluded.business_name ELSE whatsapp_contacts.business_name END,
+				updated_at = CURRENT_TIMESTAMP`),
+		c.JID, c.Phone, c.FirstName, c.FullName, c.PushName, c.BusinessName,
+	)
+	if err != nil {
+		return fmt.Errorf("upsert contact: %w", err)
+	}
+	return nil
+}
+
+func ListContacts(db *store.DB, query string, limit int) ([]Contact, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+
+	var rows *sql.Rows
+	var err error
+	if query != "" {
+		pattern := "%" + strings.ToLower(query) + "%"
+		rows, err = db.Query(
+			db.Rebind(`SELECT jid, phone, first_name, full_name, push_name, business_name
+				FROM whatsapp_contacts
+				WHERE LOWER(full_name) LIKE ? OR LOWER(push_name) LIKE ? OR LOWER(first_name) LIKE ? OR phone LIKE ?
+				ORDER BY full_name LIMIT ?`),
+			pattern, pattern, pattern, pattern, limit,
+		)
+	} else {
+		rows, err = db.Query(
+			db.Rebind(`SELECT jid, phone, first_name, full_name, push_name, business_name
+				FROM whatsapp_contacts ORDER BY full_name LIMIT ?`),
+			limit,
+		)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("list contacts: %w", err)
+	}
+	defer rows.Close()
+
+	contacts := []Contact{}
+	for rows.Next() {
+		var c Contact
+		if err := rows.Scan(&c.JID, &c.Phone, &c.FirstName, &c.FullName, &c.PushName, &c.BusinessName); err != nil {
+			return nil, fmt.Errorf("scan contact: %w", err)
+		}
+		contacts = append(contacts, c)
+	}
+	return contacts, rows.Err()
+}
+
+func GetContact(db *store.DB, jid string) (*Contact, error) {
+	var c Contact
+	err := db.QueryRow(
+		db.Rebind(`SELECT jid, phone, first_name, full_name, push_name, business_name
+			FROM whatsapp_contacts WHERE jid = ?`),
+		jid,
+	).Scan(&c.JID, &c.Phone, &c.FirstName, &c.FullName, &c.PushName, &c.BusinessName)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get contact: %w", err)
+	}
+	return &c, nil
+}
+
 func ListChats(db *store.DB) ([]Chat, error) {
 	rows, err := db.Query(`SELECT c.jid, c.name, c.is_group, c.last_message_at,
 		(SELECT COUNT(*) FROM whatsapp_messages m WHERE m.chat_jid = c.jid) as msg_count

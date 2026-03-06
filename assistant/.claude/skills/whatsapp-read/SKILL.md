@@ -34,9 +34,19 @@ whatsapp_chats (
   is_group INTEGER DEFAULT 0,
   last_message_at DATETIME
 )
+
+whatsapp_contacts (
+  jid TEXT PRIMARY KEY,
+  phone TEXT,
+  first_name TEXT,
+  full_name TEXT,
+  push_name TEXT,
+  business_name TEXT,
+  updated_at DATETIME
+)
 ```
 
-Indexes: chat_jid, timestamp, sender_jid.
+Indexes: chat_jid, timestamp, sender_jid, contacts(phone).
 
 ## Query patterns
 
@@ -64,6 +74,13 @@ sqlite3 ~/.obk/whatsapp/data.db "SELECT timestamp, sender_name, media_type, medi
 
 # Message count per chat
 sqlite3 ~/.obk/whatsapp/data.db "SELECT c.name, COUNT(*) as cnt FROM whatsapp_messages m JOIN whatsapp_chats c ON c.jid = m.chat_jid GROUP BY m.chat_jid ORDER BY cnt DESC LIMIT 20;"
+```
+
+# Look up a contact by name
+sqlite3 -header -column ~/.obk/whatsapp/data.db "SELECT jid, phone, full_name, push_name, business_name FROM whatsapp_contacts WHERE LOWER(full_name) LIKE '%name%' OR LOWER(push_name) LIKE '%name%' OR LOWER(first_name) LIKE '%name%';"
+
+# Look up a contact by phone number
+sqlite3 -header -column ~/.obk/whatsapp/data.db "SELECT jid, phone, full_name, push_name FROM whatsapp_contacts WHERE phone LIKE '%number%';"
 ```
 
 Always use `-header -column` or `-json` mode for readable output.

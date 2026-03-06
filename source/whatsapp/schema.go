@@ -27,9 +27,20 @@ CREATE TABLE IF NOT EXISTS whatsapp_chats (
 	last_message_at DATETIME
 );
 
+CREATE TABLE IF NOT EXISTS whatsapp_contacts (
+	jid TEXT PRIMARY KEY,
+	phone TEXT,
+	first_name TEXT,
+	full_name TEXT,
+	push_name TEXT,
+	business_name TEXT,
+	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_chat ON whatsapp_messages(chat_jid);
 CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_timestamp ON whatsapp_messages(timestamp);
 CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_sender ON whatsapp_messages(sender_jid);
+CREATE INDEX IF NOT EXISTS idx_whatsapp_contacts_phone ON whatsapp_contacts(phone);
 `
 
 const schemaPostgres = `
@@ -57,9 +68,20 @@ CREATE TABLE IF NOT EXISTS whatsapp_chats (
 	last_message_at TIMESTAMPTZ
 );
 
+CREATE TABLE IF NOT EXISTS whatsapp_contacts (
+	jid TEXT PRIMARY KEY,
+	phone TEXT,
+	first_name TEXT,
+	full_name TEXT,
+	push_name TEXT,
+	business_name TEXT,
+	updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_chat ON whatsapp_messages(chat_jid);
 CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_timestamp ON whatsapp_messages(timestamp);
 CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_sender ON whatsapp_messages(sender_jid);
+CREATE INDEX IF NOT EXISTS idx_whatsapp_contacts_phone ON whatsapp_contacts(phone);
 `
 
 func Migrate(db *store.DB) error {

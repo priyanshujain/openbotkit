@@ -31,6 +31,9 @@ func TestMigrate(t *testing.T) {
 	if err := db.QueryRow("SELECT COUNT(*) FROM whatsapp_chats").Scan(&count); err != nil {
 		t.Fatalf("query chats table: %v", err)
 	}
+	if err := db.QueryRow("SELECT COUNT(*) FROM whatsapp_contacts").Scan(&count); err != nil {
+		t.Fatalf("query contacts table: %v", err)
+	}
 }
 
 func TestMigrateIdempotent(t *testing.T) {

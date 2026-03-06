@@ -13,4 +13,5 @@ func init() {
 	Cmd.AddCommand(syncCmd)
 	Cmd.AddCommand(messagesCmd)
 	Cmd.AddCommand(chatsCmd)
+	Cmd.AddCommand(contactsCmd)
 }

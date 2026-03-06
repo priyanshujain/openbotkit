@@ -103,6 +103,27 @@ func (c *Client) WM() *whatsmeow.Client {
 	return c.wm
 }
 
+func (c *Client) GetAllContacts(ctx context.Context) ([]Contact, error) {
+	contacts, err := c.wm.Store.Contacts.GetAllContacts(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get contacts: %w", err)
+	}
+
+	var result []Contact
+	for jid, info := range contacts {
+		phone := jid.User
+		result = append(result, Contact{
+			JID:          jid.String(),
+			Phone:        phone,
+			FirstName:    info.FirstName,
+			FullName:     info.FullName,
+			PushName:     info.PushName,
+			BusinessName: info.BusinessName,
+		})
+	}
+	return result, nil
+}
+
 func (c *Client) ReconnectWithBackoff(ctx context.Context) error {
 	delays := []time.Duration{2, 4, 8, 16, 30}
 

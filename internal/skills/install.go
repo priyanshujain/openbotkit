@@ -21,11 +21,12 @@ type SkillMeta struct {
 }
 
 var builtinSkills = map[string]SkillMeta{
-	"email-read":    {Scopes: []string{"https://www.googleapis.com/auth/gmail.readonly"}},
-	"email-send":    {Scopes: []string{"https://www.googleapis.com/auth/gmail.modify"}, Write: true},
-	"whatsapp-read": {RequiresAuth: "whatsapp"},
-	"whatsapp-send": {RequiresAuth: "whatsapp", Write: true},
-	"memory-read":   {},
+	"email-read":      {Scopes: []string{"https://www.googleapis.com/auth/gmail.readonly"}},
+	"email-send":      {Scopes: []string{"https://www.googleapis.com/auth/gmail.modify"}, Write: true},
+	"whatsapp-read":   {RequiresAuth: "whatsapp"},
+	"whatsapp-send":   {RequiresAuth: "whatsapp", Write: true},
+	"memory-read":     {},
+	"applenotes-read": {RequiresAuth: "applenotes"},
 }
 
 // InstallResult tracks what changed during installation.
@@ -49,10 +50,10 @@ func Install(cfg *config.Config) (*InstallResult, error) {
 
 	// Determine desired built-in skills.
 	grantedGoogle := resolveGoogleScopes(cfg)
-	whatsappAuthed := isWhatsAppAuthed(cfg)
+	sourceAuthed := resolveSourceAuth(cfg)
 
 	for name, meta := range builtinSkills {
-		if !isSkillEligible(meta, grantedGoogle, whatsappAuthed) {
+		if !isSkillEligible(meta, grantedGoogle, sourceAuthed) {
 			result.Skipped = append(result.Skipped, name)
 			continue
 		}
@@ -162,31 +163,37 @@ func resolveGoogleScopes(cfg *config.Config) map[string]bool {
 	return scopes
 }
 
-func isWhatsAppAuthed(cfg *config.Config) bool {
+// resolveSourceAuth checks which non-Google sources are authenticated.
+func resolveSourceAuth(cfg *config.Config) map[string]bool {
+	authed := make(map[string]bool)
+
+	// WhatsApp: check if session.db exists and is non-empty.
 	sessionDB := cfg.WhatsAppSessionDBPath()
-	info, err := os.Stat(sessionDB)
-	if err != nil {
-		return false
+	if info, err := os.Stat(sessionDB); err == nil && info.Size() > 0 {
+		authed["whatsapp"] = true
 	}
-	return info.Size() > 0
+
+	// Apple Notes: check if linked via config.
+	if config.IsSourceLinked("applenotes") {
+		authed["applenotes"] = true
+	}
+
+	return authed
 }
 
-func isSkillEligible(meta SkillMeta, grantedGoogle map[string]bool, whatsappAuthed bool) bool {
+func isSkillEligible(meta SkillMeta, grantedGoogle map[string]bool, sourceAuthed map[string]bool) bool {
 	// No requirements — always eligible.
 	if len(meta.Scopes) == 0 && meta.RequiresAuth == "" {
 		return true
 	}
 
-	if meta.RequiresAuth == "whatsapp" {
-		return whatsappAuthed
+	if meta.RequiresAuth != "" {
+		return sourceAuthed[meta.RequiresAuth]
 	}
 
-	// Check Google scopes. For scopes like gmail.modify, also accept
-	// if gmail.readonly is granted (readonly ⊂ modify for eligibility check).
-	// But we need the exact scope for write skills.
+	// Check Google scopes. gmail.modify implies gmail.readonly.
 	for _, required := range meta.Scopes {
 		if !grantedGoogle[required] {
-			// Check if user has a broader scope. gmail.modify implies gmail.readonly.
 			if required == "https://www.googleapis.com/auth/gmail.readonly" && grantedGoogle["https://www.googleapis.com/auth/gmail.modify"] {
 				continue
 			}

@@ -31,24 +31,20 @@ type DaemonConfig struct {
 }
 
 type WhatsAppConfig struct {
-	Enabled bool          `yaml:"enabled,omitempty"`
 	Storage StorageConfig `yaml:"storage,omitempty"`
 }
 
 type GmailConfig struct {
-	Enabled             bool          `yaml:"enabled,omitempty"`
 	CredentialsFile     string        `yaml:"credentials_file,omitempty"`
 	DownloadAttachments bool          `yaml:"download_attachments,omitempty"`
 	Storage             StorageConfig `yaml:"storage,omitempty"`
 }
 
 type MemoryConfig struct {
-	Enabled bool          `yaml:"enabled,omitempty"`
 	Storage StorageConfig `yaml:"storage,omitempty"`
 }
 
 type AppleNotesConfig struct {
-	Enabled bool          `yaml:"enabled,omitempty"`
 	Storage StorageConfig `yaml:"storage,omitempty"`
 }
 

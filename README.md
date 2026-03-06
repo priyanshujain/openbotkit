@@ -65,10 +65,9 @@ obk status
 
 ## Building Your Assistant
 
-OpenBotKit ships an `assistant/` directory, a ready-to-use Claude Code workspace with skills wired to your synced data.
+The `assistant/` directory is a ready-to-use Claude Code workspace with skills wired to your synced data.
 
 ```bash
-# Symlink outside the repo (avoids loading dev-only CLAUDE.md)
 ln -s /path/to/openbotkit/assistant ~/assistant
 cd ~/assistant && claude
 ```
@@ -83,32 +82,9 @@ From there you can ask things like:
 
 Each skill is just a plain text file with SQL patterns and CLI commands. You can read them, change them, or write your own. No magic. See [`assistant/`](assistant/) for setup details.
 
-## Configuration
+## Data directory
 
-Config lives at `~/.obk/config.yaml` (override with `OBK_CONFIG_DIR`):
-
-```yaml
-gmail:
-  credentials_file: ~/.obk/gmail/credentials.json
-  download_attachments: false
-  storage:
-    driver: sqlite    # or "postgres"
-    dsn: ""           # postgres DSN; sqlite path auto-derived
-
-whatsapp:
-  storage:
-    driver: sqlite
-
-memory:
-  storage:
-    driver: sqlite
-
-applenotes:
-  storage:
-    driver: sqlite
-```
-
-### Data directory
+Config and all synced data live under `~/.obk/` (override with `OBK_CONFIG_DIR`). Run `obk config show` to see your current configuration.
 
 ```
 ~/.obk/

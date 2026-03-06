@@ -9,6 +9,7 @@ import (
 	"github.com/priyanshujain/openbotkit/config"
 	"github.com/priyanshujain/openbotkit/provider/google"
 	"github.com/priyanshujain/openbotkit/source"
+	ansrc "github.com/priyanshujain/openbotkit/source/applenotes"
 	gmailsrc "github.com/priyanshujain/openbotkit/source/gmail"
 	memorysrc "github.com/priyanshujain/openbotkit/source/memory"
 	wasrc "github.com/priyanshujain/openbotkit/source/whatsapp"
@@ -39,6 +40,9 @@ var statusCmd = &cobra.Command{
 
 		mem := memorysrc.New(memorysrc.Config{})
 		source.Register(mem)
+
+		an := ansrc.New(ansrc.Config{})
+		source.Register(an)
 
 		ctx := context.Background()
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
@@ -74,6 +78,15 @@ var statusCmd = &cobra.Command{
 				})
 				if db != nil {
 					memorysrc.Migrate(db)
+				}
+			case "applenotes":
+				dsn := cfg.AppleNotesDataDSN()
+				db, _ = store.Open(store.Config{
+					Driver: cfg.AppleNotes.Storage.Driver,
+					DSN:    dsn,
+				})
+				if db != nil {
+					ansrc.Migrate(db)
 				}
 			}
 

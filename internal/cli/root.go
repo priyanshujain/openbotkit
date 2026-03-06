@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	applenotescli "github.com/priyanshujain/openbotkit/internal/cli/applenotes"
 	authcli "github.com/priyanshujain/openbotkit/internal/cli/auth"
 	"github.com/priyanshujain/openbotkit/internal/cli/gmail"
 	memorycli "github.com/priyanshujain/openbotkit/internal/cli/memory"
@@ -29,6 +30,7 @@ var versionCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(applenotescli.Cmd)
 	rootCmd.AddCommand(authcli.Cmd)
 	rootCmd.AddCommand(daemonCmd)
 	rootCmd.AddCommand(gmail.Cmd)

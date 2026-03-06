@@ -26,6 +26,12 @@ func (d *Daemon) Run(ctx context.Context) error {
 		return fmt.Errorf("ensure config dir: %w", err)
 	}
 
+	lock, err := acquireLock()
+	if err != nil {
+		return err
+	}
+	defer releaseLock(lock)
+
 	log.Println("starting daemon")
 
 	client, db, err := newRiverClient(ctx, d.cfg)

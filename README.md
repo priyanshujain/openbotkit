@@ -63,6 +63,21 @@ obk whatsapp sync
 obk status
 ```
 
+## How it works
+
+```mermaid
+flowchart LR
+    You --> Claude["Claude Code"]
+    Claude --> Skills
+    Skills --> sqlite3
+    Skills --> obk["obk CLI"]
+    obk --> Gmail
+    obk --> WhatsApp
+    obk --> Notes["Apple Notes"]
+    sqlite3 --> DB["~/.obk/*.db"]
+    obk --> DB
+```
+
 ## Building Your Assistant
 
 The `assistant/` directory is a ready-to-use Claude Code workspace with skills wired to your synced data.

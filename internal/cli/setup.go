@@ -4,17 +4,24 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/huh"
 	"github.com/priyanshujain/openbotkit/config"
+	"github.com/priyanshujain/openbotkit/internal/skills"
 	"github.com/priyanshujain/openbotkit/internal/tty"
 	"github.com/priyanshujain/openbotkit/provider/google"
 	ansrc "github.com/priyanshujain/openbotkit/source/applenotes"
 	"github.com/priyanshujain/openbotkit/store"
 	"github.com/spf13/cobra"
 )
+
+// gwsServices lists the Google Workspace services available via gws.
+var gwsServices = []string{"calendar", "drive", "docs", "sheets", "tasks", "people"}
 
 var setupCmd = &cobra.Command{
 	Use:   "setup",
@@ -31,10 +38,17 @@ var setupCmd = &cobra.Command{
 		sourceOptions := []huh.Option[string]{
 			huh.NewOption("Gmail", "gmail"),
 			huh.NewOption("WhatsApp", "whatsapp"),
+			huh.NewOption("Google Calendar", "calendar"),
+			huh.NewOption("Google Drive", "drive"),
+			huh.NewOption("Google Docs", "docs"),
+			huh.NewOption("Google Sheets", "sheets"),
+			huh.NewOption("Google Tasks", "tasks"),
+			huh.NewOption("Google Contacts", "people"),
 		}
 		if runtime.GOOS == "darwin" {
 			sourceOptions = append(sourceOptions, huh.NewOption("Apple Notes", "applenotes"))
 		}
+
 		err := huh.NewForm(
 			huh.NewGroup(
 				huh.NewMultiSelect[string]().
@@ -53,10 +67,14 @@ var setupCmd = &cobra.Command{
 		}
 
 		needsGoogle := false
+		var selectedGWS []string
 		for _, s := range sources {
 			if s == "gmail" {
 				needsGoogle = true
-				break
+			}
+			if isGWSService(s) {
+				needsGoogle = true
+				selectedGWS = append(selectedGWS, s)
 			}
 		}
 
@@ -67,6 +85,12 @@ var setupCmd = &cobra.Command{
 
 		if needsGoogle {
 			if err := setupGoogle(cfg); err != nil {
+				return err
+			}
+		}
+
+		if len(selectedGWS) > 0 {
+			if err := setupGWS(cfg, selectedGWS); err != nil {
 				return err
 			}
 		}
@@ -82,6 +106,23 @@ var setupCmd = &cobra.Command{
 		if err := cfg.Save(); err != nil {
 			return fmt.Errorf("save config: %w", err)
 		}
+
+		// Install skills based on current auth state.
+		fmt.Println("\n  -- Installing skills --")
+		result, err := skills.Install(cfg)
+		if err != nil {
+			return fmt.Errorf("install skills: %w", err)
+		}
+		for _, name := range result.Installed {
+			fmt.Printf("  + %s\n", name)
+		}
+		for _, name := range result.Skipped {
+			fmt.Printf("  - %s (skipped)\n", name)
+		}
+		for _, name := range result.Removed {
+			fmt.Printf("  x %s (removed)\n", name)
+		}
+		fmt.Printf("  %d skills installed to %s\n", len(result.Installed), skills.SkillsDir())
 
 		fmt.Println("\n  Setup complete!")
 		fmt.Println("  Next steps:")
@@ -104,7 +145,7 @@ func setupGoogle(cfg *config.Config) error {
 		return fmt.Errorf("create provider dir: %w", err)
 	}
 
-	// Step 2: Credentials path.
+	// Credentials path.
 	defaultCredPath := cfg.GoogleCredentialsFile()
 	var credPath string
 
@@ -139,7 +180,7 @@ func setupGoogle(cfg *config.Config) error {
 	}
 	cfg.Providers.Google.CredentialsFile = credPath
 
-	// Step 3: Scope selection.
+	// Scope selection.
 	var scopes []string
 	err = huh.NewForm(
 		huh.NewGroup(
@@ -160,7 +201,7 @@ func setupGoogle(cfg *config.Config) error {
 		scopes = []string{"https://www.googleapis.com/auth/gmail.readonly"}
 	}
 
-	// Step 4: OAuth flow.
+	// OAuth flow.
 	gp := google.New(google.Config{
 		CredentialsFile: credPath,
 		TokenDBPath:     cfg.GoogleTokenDBPath(),
@@ -174,7 +215,7 @@ func setupGoogle(cfg *config.Config) error {
 
 	fmt.Printf("\n  Authenticated as %s\n", email)
 
-	// Step 5: Sync window.
+	// Sync window.
 	var syncDays string
 	err = huh.NewForm(
 		huh.NewGroup(
@@ -193,6 +234,93 @@ func setupGoogle(cfg *config.Config) error {
 	}
 
 	fmt.Printf("  Sync window: %s days\n", syncDays)
+	return nil
+}
+
+func setupGWS(cfg *config.Config, services []string) error {
+	fmt.Printf("\n  -- Google Workspace Setup (%s) --\n", strings.Join(services, ", "))
+	fmt.Println("  These services are powered by gws (Google Workspace CLI).")
+
+	// Check for gws binary.
+	gwsPath, err := exec.LookPath("gws")
+	if err != nil {
+		fmt.Println("\n  Checking for gws... not found.")
+		fmt.Println("  Install gws (requires Node.js):")
+		fmt.Println("    npm install -g @googleworkspace/cli")
+		fmt.Println("\n  Waiting for gws to be installed... (run the command above in another tab)")
+		fmt.Println("  Press Ctrl+C to cancel.")
+
+		const maxAttempts = 60 // 5 minutes
+		for attempt := range maxAttempts {
+			time.Sleep(5 * time.Second)
+			gwsPath, err = exec.LookPath("gws")
+			if err == nil {
+				break
+			}
+			fmt.Println("  Checking... not found")
+			if attempt == maxAttempts-1 {
+				return fmt.Errorf("gws not found after %d attempts — install it and re-run obk setup", maxAttempts)
+			}
+		}
+		fmt.Printf("  Checking... found gws at %s\n", gwsPath)
+	} else {
+		fmt.Printf("  gws found at %s\n", gwsPath)
+	}
+
+	// Share credentials with gws.
+	credPath := cfg.GoogleCredentialsFile()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("get home directory: %w", err)
+	}
+	gwsCredDir := filepath.Join(home, ".config", "gws")
+	gwsCredPath := filepath.Join(gwsCredDir, "client_secret.json")
+
+	if err := os.MkdirAll(gwsCredDir, 0700); err != nil {
+		return fmt.Errorf("create gws config dir: %w", err)
+	}
+
+	credData, err := os.ReadFile(credPath)
+	if err != nil {
+		return fmt.Errorf("read credentials: %w", err)
+	}
+	if err := os.WriteFile(gwsCredPath, credData, 0600); err != nil {
+		return fmt.Errorf("copy credentials to gws: %w", err)
+	}
+	fmt.Printf("  Shared credentials with gws (%s)\n", gwsCredPath)
+
+	// Run gws auth login.
+	scopeArg := strings.Join(services, ",")
+	fmt.Println("\n  Opening browser for Google Workspace access...")
+	authCmd := exec.Command(gwsPath, "auth", "login", "--scopes", scopeArg)
+	authCmd.Stdout = os.Stdout
+	authCmd.Stderr = os.Stderr
+	authCmd.Stdin = os.Stdin
+	if err := authCmd.Run(); err != nil {
+		return fmt.Errorf("gws auth login: %w", err)
+	}
+	fmt.Println("  Google Workspace authenticated.")
+
+	// Save to config.
+	if cfg.Integrations == nil {
+		cfg.Integrations = &config.IntegrationsConfig{}
+	}
+	if cfg.Integrations.GWS == nil {
+		cfg.Integrations.GWS = &config.GWSConfig{}
+	}
+	cfg.Integrations.GWS.Enabled = true
+
+	// Merge with existing services.
+	existing := make(map[string]bool)
+	for _, s := range cfg.Integrations.GWS.Services {
+		existing[s] = true
+	}
+	for _, s := range services {
+		if !existing[s] {
+			cfg.Integrations.GWS.Services = append(cfg.Integrations.GWS.Services, s)
+		}
+	}
+
 	return nil
 }
 
@@ -224,6 +352,15 @@ func setupAppleNotes(cfg *config.Config) error {
 
 	fmt.Printf("  Synced %d notes\n", result.Synced)
 	return nil
+}
+
+func isGWSService(s string) bool {
+	for _, svc := range gwsServices {
+		if s == svc {
+			return true
+		}
+	}
+	return false
 }
 
 // cleanPath handles drag-and-drop paths that may have quotes and whitespace.

@@ -17,3 +17,6 @@ credentials.json
 
 # obk data directory (local machine data)
 .obk/
+
+# Skills symlink (machine-specific, created by make install)
+assistant/.claude/skills

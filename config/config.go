@@ -9,12 +9,22 @@ import (
 )
 
 type Config struct {
-	Providers  *ProvidersConfig  `yaml:"providers,omitempty"`
-	Gmail      *GmailConfig      `yaml:"gmail,omitempty"`
-	WhatsApp   *WhatsAppConfig   `yaml:"whatsapp,omitempty"`
-	Memory     *MemoryConfig     `yaml:"memory,omitempty"`
-	AppleNotes *AppleNotesConfig `yaml:"applenotes,omitempty"`
-	Daemon     *DaemonConfig     `yaml:"daemon,omitempty"`
+	Providers    *ProvidersConfig    `yaml:"providers,omitempty"`
+	Gmail        *GmailConfig        `yaml:"gmail,omitempty"`
+	WhatsApp     *WhatsAppConfig     `yaml:"whatsapp,omitempty"`
+	Memory       *MemoryConfig       `yaml:"memory,omitempty"`
+	AppleNotes   *AppleNotesConfig   `yaml:"applenotes,omitempty"`
+	Daemon       *DaemonConfig       `yaml:"daemon,omitempty"`
+	Integrations *IntegrationsConfig `yaml:"integrations,omitempty"`
+}
+
+type IntegrationsConfig struct {
+	GWS *GWSConfig `yaml:"gws,omitempty"`
+}
+
+type GWSConfig struct {
+	Enabled  bool     `yaml:"enabled,omitempty"`
+	Services []string `yaml:"services,omitempty"`
 }
 
 type ProvidersConfig struct {

@@ -10,27 +10,27 @@ allowed-tools: Bash(obk *), Bash(sqlite3 *)
 obk whatsapp messages send --to <jid> --text <message>
 ```
 
-## Finding the recipient JID
+## Finding the recipient
 
-Look up JIDs from the local database before sending:
+Always resolve the recipient before sending. Use the contacts table first, then fall back to chats.
 
 ```bash
-# List all chats with JIDs
-sqlite3 -header -column ~/.obk/whatsapp/data.db "SELECT jid, name, is_group FROM whatsapp_chats ORDER BY last_message_at DESC LIMIT 20;"
+# Search contacts by name (preferred — has phone number and full name)
+sqlite3 -header -column ~/.obk/whatsapp/data.db "SELECT jid, phone, full_name, push_name FROM whatsapp_contacts WHERE LOWER(full_name) LIKE '%name%' OR LOWER(push_name) LIKE '%name%' OR LOWER(first_name) LIKE '%name%';"
 
-# Search for a contact by name
-sqlite3 -header -column ~/.obk/whatsapp/data.db "SELECT jid, name FROM whatsapp_chats WHERE LOWER(name) LIKE '%search term%';"
+# Fall back to chats if not found in contacts
+sqlite3 -header -column ~/.obk/whatsapp/data.db "SELECT jid, name FROM whatsapp_chats WHERE LOWER(name) LIKE '%name%';"
 ```
 
 JID formats:
-- Individual: `<phone>@s.whatsapp.net` (e.g. `1234567890@s.whatsapp.net`)
+- Individual: `<phone>@s.whatsapp.net` (e.g. `919876543210@s.whatsapp.net`)
 - Group: `<id>@g.us`
 
 ## Example
 
 ```bash
 # Send a message to a contact
-obk whatsapp messages send --to "1234567890@s.whatsapp.net" --text "Hello!"
+obk whatsapp messages send --to "919876543210@s.whatsapp.net" --text "Hello!"
 
 # Send a message to a group
 obk whatsapp messages send --to "120363001234567890@g.us" --text "Hey everyone"
@@ -40,4 +40,5 @@ obk whatsapp messages send --to "120363001234567890@g.us" --text "Hey everyone"
 
 - Requires an authenticated WhatsApp session (`obk whatsapp auth login`)
 - The sent message is saved to the local database automatically
-- Always confirm the recipient with the user before sending
+- If multiple contacts match, show the matches and ask the user to clarify
+- Always confirm the recipient and content with the user before sending

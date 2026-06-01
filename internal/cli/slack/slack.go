@@ -33,5 +33,4 @@ func init() {
 	Cmd.AddCommand(searchCmd)
 	Cmd.AddCommand(channelsCmd)
 	Cmd.AddCommand(readCmd)
-	Cmd.AddCommand(exportCmd)
 }

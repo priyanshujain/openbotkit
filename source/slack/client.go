@@ -204,6 +204,45 @@ func (c *Client) ConversationsHistory(ctx context.Context, channel string, opts 
 	return resp.Messages, nil
 }
 
+// ConversationsHistoryAll fetches all messages from a channel, paginating through all pages.
+func (c *Client) ConversationsHistoryAll(ctx context.Context, channel string, opts HistoryOptions) ([]Message, error) {
+	var all []Message
+	cursor := opts.Cursor
+	for {
+		params := url.Values{"channel": {channel}, "limit": {"200"}}
+		if cursor != "" {
+			params.Set("cursor", cursor)
+		}
+		if opts.Oldest != "" {
+			params.Set("oldest", opts.Oldest)
+		}
+		if opts.Latest != "" {
+			params.Set("latest", opts.Latest)
+		}
+
+		body, err := c.call(ctx, "conversations.history", params)
+		if err != nil {
+			return nil, err
+		}
+
+		var resp struct {
+			Messages []Message `json:"messages"`
+			HasMore  bool      `json:"has_more"`
+			apiResponse
+		}
+		if err := json.Unmarshal(body, &resp); err != nil {
+			return nil, fmt.Errorf("parse history: %w", err)
+		}
+		all = append(all, resp.Messages...)
+
+		cursor = resp.Metadata.NextCursor
+		if !resp.HasMore || cursor == "" {
+			break
+		}
+	}
+	return all, nil
+}
+
 func (c *Client) ConversationsReplies(ctx context.Context, channel, threadTS string, opts HistoryOptions) ([]Message, error) {
 	params := url.Values{
 		"channel": {channel},

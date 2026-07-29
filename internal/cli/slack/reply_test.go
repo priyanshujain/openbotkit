@@ -6,8 +6,11 @@ import (
 	"testing"
 )
 
+// OBK_CONFIG_DIR points at an empty dir so the test never sees the developer's
+// real Slack config and behaves the same here as in CI.
 func runReply(t *testing.T, args ...string) error {
 	t.Helper()
+	t.Setenv("OBK_CONFIG_DIR", t.TempDir())
 	replyCmd.Flags().Set("channel-id", "")
 	replyCmd.Flags().Set("thread-id", "")
 	replyCmd.Flags().Set("text", "")
@@ -56,5 +59,11 @@ func TestReplyCmd_RejectsMalformedPermalink(t *testing.T) {
 	err := runReply(t, "https://example.com/not-slack", "--text", "hello")
 	if err == nil {
 		t.Fatal("expected error for a non-Slack URL")
+	}
+	if !strings.Contains(err.Error(), "Slack permalink") {
+		t.Errorf("error = %q", err)
+	}
+	if strings.Contains(err.Error(), "no Slack workspace configured") {
+		t.Errorf("credentials were loaded before validating input: %q", err)
 	}
 }

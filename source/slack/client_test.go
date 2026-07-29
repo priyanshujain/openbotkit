@@ -1,6 +1,7 @@
 package slack
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -413,6 +414,138 @@ func TestClient_UsersInfo(t *testing.T) {
 	}
 	if user.Name != "alice" {
 		t.Errorf("name = %q", user.Name)
+	}
+}
+
+func TestClient_FilesInfo(t *testing.T) {
+	c := testServer(t, func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+		if r.FormValue("file") != "F123" {
+			t.Errorf("file = %q", r.FormValue("file"))
+		}
+		json.NewEncoder(w).Encode(map[string]any{
+			"ok": true,
+			"file": map[string]any{
+				"id":          "F123",
+				"name":        "screenshot.png",
+				"mimetype":    "image/png",
+				"url_private": "https://files.slack.com/files-pri/T1-F123/screenshot.png",
+			},
+		})
+	})
+
+	f, err := c.FilesInfo(context.Background(), "F123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.Name != "screenshot.png" || f.Mimetype != "image/png" {
+		t.Errorf("file = %+v", f)
+	}
+	if f.URLPrivate == "" {
+		t.Error("url_private missing")
+	}
+}
+
+func TestClient_BotsInfo(t *testing.T) {
+	c := testServer(t, func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+		if r.FormValue("bot") != "B123" {
+			t.Errorf("bot = %q", r.FormValue("bot"))
+		}
+		json.NewEncoder(w).Encode(map[string]any{
+			"ok":  true,
+			"bot": map[string]any{"id": "B123", "name": "Sentry"},
+		})
+	})
+
+	b, err := c.BotsInfo(context.Background(), "B123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b.Name != "Sentry" {
+		t.Errorf("name = %q", b.Name)
+	}
+}
+
+func TestClient_DownloadFile(t *testing.T) {
+	var gotAuth string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "image/png")
+		w.Write([]byte("\x89PNG\r\n\x1a\nfake image bytes"))
+	}))
+	defer srv.Close()
+
+	c := NewClient("xoxp-test-token", "")
+	var buf bytes.Buffer
+	if err := c.DownloadFile(context.Background(), srv.URL+"/files-pri/T1-F1/shot.png", &buf); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.HasPrefix(buf.Bytes(), []byte("\x89PNG")) {
+		t.Errorf("body = %q", buf.String())
+	}
+	if gotAuth != "Bearer xoxp-test-token" {
+		t.Errorf("auth = %q", gotAuth)
+	}
+}
+
+func TestClient_DownloadFile_BrowserAuth(t *testing.T) {
+	var gotCookie, gotAuth string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotCookie = r.Header.Get("Cookie")
+		gotAuth = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "image/jpeg")
+		w.Write([]byte("jpegdata"))
+	}))
+	defer srv.Close()
+
+	c := NewClient("xoxc-browser-token", "xoxd-cookie")
+	var buf bytes.Buffer
+	if err := c.DownloadFile(context.Background(), srv.URL+"/shot.jpeg", &buf); err != nil {
+		t.Fatal(err)
+	}
+	if gotCookie != "d=xoxd-cookie" {
+		t.Errorf("cookie = %q", gotCookie)
+	}
+	if gotAuth != "" {
+		t.Errorf("browser download should not send Authorization, got %q", gotAuth)
+	}
+}
+
+// Slack answers an unauthenticated file request with HTTP 200 and a login
+// page; without a content-type check that HTML lands in the output file.
+func TestClient_DownloadFile_HTMLLoginPage(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(200)
+		w.Write([]byte("<!DOCTYPE html><html><body>Sign in to Slack</body></html>"))
+	}))
+	defer srv.Close()
+
+	c := NewClient("xoxc-expired", "stale-cookie")
+	var buf bytes.Buffer
+	err := c.DownloadFile(context.Background(), srv.URL+"/shot.png", &buf)
+	if err == nil {
+		t.Fatal("expected error for HTML login page")
+	}
+	if !strings.Contains(err.Error(), "obk slack auth login") {
+		t.Errorf("error should point at re-auth, got: %v", err)
+	}
+	if buf.Len() != 0 {
+		t.Errorf("nothing should be written on auth failure, got %d bytes", buf.Len())
+	}
+}
+
+func TestClient_DownloadFile_HTTPError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(404)
+	}))
+	defer srv.Close()
+
+	c := NewClient("xoxp-test-token", "")
+	var buf bytes.Buffer
+	if err := c.DownloadFile(context.Background(), srv.URL+"/missing.png", &buf); err == nil {
+		t.Fatal("expected error for HTTP 404")
 	}
 }
 

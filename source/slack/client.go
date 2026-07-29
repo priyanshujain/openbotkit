@@ -123,9 +123,9 @@ func (c *Client) SearchMessages(ctx context.Context, query string, opts SearchOp
 
 	var resp struct {
 		Messages struct {
-			Total   int `json:"total"`
-			Page    int `json:"page"`
-			Pages   int `json:"pages"`
+			Total   int       `json:"total"`
+			Page    int       `json:"page"`
+			Pages   int       `json:"pages"`
 			Matches []Message `json:"matches"`
 		} `json:"messages"`
 	}
@@ -340,6 +340,73 @@ func (c *Client) UsersInfo(ctx context.Context, userID string) (*User, error) {
 		return nil, fmt.Errorf("parse user info: %w", err)
 	}
 	return &resp.User, nil
+}
+
+func (c *Client) FilesInfo(ctx context.Context, fileID string) (*File, error) {
+	body, err := c.call(ctx, "files.info", url.Values{"file": {fileID}})
+	if err != nil {
+		return nil, err
+	}
+
+	var resp struct {
+		File File `json:"file"`
+	}
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, fmt.Errorf("parse file info: %w", err)
+	}
+	return &resp.File, nil
+}
+
+func (c *Client) BotsInfo(ctx context.Context, botID string) (*Bot, error) {
+	body, err := c.call(ctx, "bots.info", url.Values{"bot": {botID}})
+	if err != nil {
+		return nil, err
+	}
+
+	var resp struct {
+		Bot Bot `json:"bot"`
+	}
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, fmt.Errorf("parse bot info: %w", err)
+	}
+	return &resp.Bot, nil
+}
+
+// DownloadFile streams a Slack file URL to w. Slack serves an HTML login page
+// with HTTP 200 when auth fails, so the content type is checked before any
+// bytes reach the writer.
+func (c *Client) DownloadFile(ctx context.Context, rawURL string, w io.Writer) error {
+	req, err := http.NewRequestWithContext(ctx, "GET", rawURL, nil)
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+	if c.isBrowserToken() {
+		req.Header.Set("Cookie", "d="+c.cookie)
+	} else {
+		req.Header.Set("Authorization", "Bearer "+c.token)
+	}
+
+	resp, err := c.downloadClient().Do(req)
+	if err != nil {
+		return fmt.Errorf("download %s: %w", rawURL, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("download %s: HTTP %d", rawURL, resp.StatusCode)
+	}
+	if ct := resp.Header.Get("Content-Type"); strings.HasPrefix(ct, "text/html") {
+		return fmt.Errorf("download %s: got an HTML page instead of the file, credentials are missing or expired; run: obk slack auth login", rawURL)
+	}
+
+	if _, err := io.Copy(w, resp.Body); err != nil {
+		return fmt.Errorf("write file: %w", err)
+	}
+	return nil
+}
+
+func (c *Client) downloadClient() *http.Client {
+	return &http.Client{Timeout: 5 * time.Minute}
 }
 
 // Write methods

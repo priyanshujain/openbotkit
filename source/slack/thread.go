@@ -33,8 +33,8 @@ func FetchThread(ctx context.Context, api API, cache *UserCache, channelID, ts s
 	}
 
 	// Asking for a reply returns that reply pointing at the real root; follow it.
-	if len(msgs) > 0 && msgs[0].ThreadTS != "" && msgs[0].ThreadTS != rootTS {
-		rootTS = msgs[0].ThreadTS
+	if root := rootOf(msgs, rootTS); root != rootTS {
+		rootTS = root
 		msgs, err = api.ConversationsRepliesAll(ctx, channelID, rootTS, HistoryOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("fetch thread root: %w", err)
@@ -62,6 +62,28 @@ func FetchThread(ctx context.Context, api API, cache *UserCache, channelID, ts s
 		thread.Users = names
 	}
 	return thread, nil
+}
+
+// ResolveThreadRoot returns the root timestamp of the thread containing ts.
+// Writers need it because Slack expects a thread's parent ts, not a reply's.
+func ResolveThreadRoot(ctx context.Context, api API, channelID, ts string) (string, error) {
+	askedTS, err := MessageIDToTS(ts)
+	if err != nil {
+		return "", err
+	}
+	msgs, err := api.ConversationsReplies(ctx, channelID, askedTS, HistoryOptions{Limit: 1})
+	if err != nil {
+		return "", fmt.Errorf("resolve thread root: %w", err)
+	}
+	return rootOf(msgs, askedTS), nil
+}
+
+// rootOf reads the real thread root off the first message returned for askedTS.
+func rootOf(msgs []Message, askedTS string) string {
+	if len(msgs) > 0 && msgs[0].ThreadTS != "" && msgs[0].ThreadTS != askedTS {
+		return msgs[0].ThreadTS
+	}
+	return askedTS
 }
 
 // resolveNames looks up every ID the thread references: authors, in-text

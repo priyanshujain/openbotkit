@@ -22,6 +22,14 @@ func (a *threadAPI) ConversationsRepliesAll(_ context.Context, _ string, ts stri
 	return a.byTS[ts], nil
 }
 
+func (a *threadAPI) ConversationsReplies(_ context.Context, _ string, ts string, _ HistoryOptions) ([]Message, error) {
+	a.requested = append(a.requested, ts)
+	if a.err != nil {
+		return nil, a.err
+	}
+	return a.byTS[ts], nil
+}
+
 func TestFetchThread_Basic(t *testing.T) {
 	t.Setenv("OBK_CONFIG_DIR", t.TempDir())
 	api := &threadAPI{
@@ -206,6 +214,39 @@ func TestFetchThread_NilCacheSkipsNames(t *testing.T) {
 	}
 	if th.Messages[0].MessageID != "p111222222" {
 		t.Errorf("message_id = %q", th.Messages[0].MessageID)
+	}
+}
+
+func TestResolveThreadRoot(t *testing.T) {
+	root := "1785319311.419309"
+	reply := "1785319451.036269"
+	api := &threadAPI{
+		byTS: map[string][]Message{
+			reply: {{TS: reply, ThreadTS: root, Text: "a reply"}},
+			root:  {{TS: root, Text: "the root"}},
+		},
+	}
+
+	got, err := ResolveThreadRoot(context.Background(), api, "C01", "p1785319451036269")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != root {
+		t.Errorf("got %q, want %q", got, root)
+	}
+
+	got, err = ResolveThreadRoot(context.Background(), api, "C01", root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != root {
+		t.Errorf("root should resolve to itself, got %q", got)
+	}
+}
+
+func TestResolveThreadRoot_InvalidTS(t *testing.T) {
+	if _, err := ResolveThreadRoot(context.Background(), &threadAPI{}, "C01", "nope"); err == nil {
+		t.Fatal("expected error for malformed timestamp")
 	}
 }
 

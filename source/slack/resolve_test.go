@@ -2,6 +2,7 @@ package slack
 
 import (
 	"context"
+	"io"
 	"testing"
 )
 
@@ -22,12 +23,24 @@ func (m *mockAPI) ConversationsHistory(context.Context, string, HistoryOptions) 
 func (m *mockAPI) ConversationsReplies(context.Context, string, string, HistoryOptions) ([]Message, error) {
 	return nil, nil
 }
+func (m *mockAPI) ConversationsRepliesAll(context.Context, string, string, HistoryOptions) ([]Message, error) {
+	return nil, nil
+}
 func (m *mockAPI) ConversationsList(context.Context) ([]Channel, error) {
 	return m.channels, nil
 }
 func (m *mockAPI) UsersList(context.Context) ([]User, error) { return m.users, nil }
 func (m *mockAPI) UsersInfo(context.Context, string) (*User, error) {
 	return nil, nil
+}
+func (m *mockAPI) BotsInfo(context.Context, string) (*Bot, error) {
+	return nil, nil
+}
+func (m *mockAPI) FilesInfo(context.Context, string) (*File, error) {
+	return nil, nil
+}
+func (m *mockAPI) DownloadFile(context.Context, string, io.Writer) error {
+	return nil
 }
 func (m *mockAPI) PostMessage(context.Context, string, string, string) (string, error) {
 	return "", nil

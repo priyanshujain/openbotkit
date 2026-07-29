@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"strings"
 	"testing"
 
@@ -16,8 +17,16 @@ type mockSlackAPI struct {
 	repliesResult        []slack.Message
 	channels             []slack.Channel
 	users                []slack.User
+	userInfo             map[string]*slack.User
+	botInfo              map[string]*slack.Bot
+	fileInfo             *slack.File
+	downloadBody         string
+	downloadErr          error
+	downloadedURL        string
+	repliesTS            []string
 	postedChannel        string
 	postedText           string
+	postedThreadTS       string
 	postedTS             string
 	updatedTS            string
 	deletedTS            string
@@ -35,19 +44,48 @@ func (m *mockSlackAPI) SearchFiles(_ context.Context, _ string, _ slack.SearchOp
 func (m *mockSlackAPI) ConversationsHistory(_ context.Context, _ string, _ slack.HistoryOptions) ([]slack.Message, error) {
 	return m.historyResult, m.err
 }
-func (m *mockSlackAPI) ConversationsReplies(_ context.Context, _ string, _ string, _ slack.HistoryOptions) ([]slack.Message, error) {
+func (m *mockSlackAPI) ConversationsReplies(_ context.Context, _ string, ts string, _ slack.HistoryOptions) ([]slack.Message, error) {
+	m.repliesTS = append(m.repliesTS, ts)
+	return m.repliesResult, m.err
+}
+func (m *mockSlackAPI) ConversationsRepliesAll(_ context.Context, _ string, ts string, _ slack.HistoryOptions) ([]slack.Message, error) {
+	m.repliesTS = append(m.repliesTS, ts)
 	return m.repliesResult, m.err
 }
 func (m *mockSlackAPI) ConversationsList(context.Context) ([]slack.Channel, error) {
 	return m.channels, m.err
 }
 func (m *mockSlackAPI) UsersList(context.Context) ([]slack.User, error) { return m.users, m.err }
-func (m *mockSlackAPI) UsersInfo(context.Context, string) (*slack.User, error) {
+func (m *mockSlackAPI) UsersInfo(_ context.Context, id string) (*slack.User, error) {
+	if u, ok := m.userInfo[id]; ok {
+		return u, nil
+	}
 	return nil, m.err
 }
-func (m *mockSlackAPI) PostMessage(_ context.Context, channel, text, _ string) (string, error) {
+func (m *mockSlackAPI) BotsInfo(_ context.Context, id string) (*slack.Bot, error) {
+	if b, ok := m.botInfo[id]; ok {
+		return b, nil
+	}
+	return nil, m.err
+}
+func (m *mockSlackAPI) FilesInfo(context.Context, string) (*slack.File, error) {
+	if m.fileInfo != nil {
+		return m.fileInfo, nil
+	}
+	return nil, m.err
+}
+func (m *mockSlackAPI) DownloadFile(_ context.Context, url string, w io.Writer) error {
+	m.downloadedURL = url
+	if m.downloadErr != nil {
+		return m.downloadErr
+	}
+	_, err := w.Write([]byte(m.downloadBody))
+	return err
+}
+func (m *mockSlackAPI) PostMessage(_ context.Context, channel, text, threadTS string) (string, error) {
 	m.postedChannel = channel
 	m.postedText = text
+	m.postedThreadTS = threadTS
 	return m.postedTS, m.err
 }
 func (m *mockSlackAPI) UpdateMessage(_ context.Context, _, ts, _ string) error {

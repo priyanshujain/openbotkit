@@ -27,3 +27,11 @@
   - Keep commits small: aim for under 20 lines changed per commit.
   - Don't batch multiple unrelated changes into one commit.
   - Commit early and often — a working 5-line change is better than a pending 200-line change.
+
+## Pull Request Rules
+
+  - PR descriptions are plain text. No markdown, no headings, no bullets, no bold, no code blocks, no emoji, no tables.
+  - A few lines, that's it. Don't write an essay.
+  - Super casual, like telling a teammate over chat. Lowercase is fine.
+  - Don't polish it. A few typos and loose grammar are fine and preferred over something that reads like a template.
+  - Keep the facts right even though the tone is casual. Casual is about the voice, not about being vague or wrong.

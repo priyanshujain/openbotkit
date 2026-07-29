@@ -43,4 +43,5 @@ func init() {
 	Cmd.AddCommand(channelsCmd)
 	Cmd.AddCommand(readCmd)
 	Cmd.AddCommand(threadCmd)
+	Cmd.AddCommand(mediaCmd)
 }

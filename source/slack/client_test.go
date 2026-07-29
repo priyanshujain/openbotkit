@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 )
@@ -252,6 +253,97 @@ func TestClient_ConversationsReplies(t *testing.T) {
 	}
 	if msgs[1].Text != "reply" {
 		t.Errorf("reply text = %q", msgs[1].Text)
+	}
+}
+
+func TestClient_ConversationsRepliesAll_Paginates(t *testing.T) {
+	var cursors []string
+	c := testServer(t, func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+		cursor := r.FormValue("cursor")
+		cursors = append(cursors, cursor)
+
+		switch cursor {
+		case "":
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok": true,
+				"messages": []map[string]any{
+					{"ts": "111.222", "text": "parent"},
+					{"ts": "333.444", "text": "reply 1", "thread_ts": "111.222"},
+				},
+				"has_more":          true,
+				"response_metadata": map[string]any{"next_cursor": "page2"},
+			})
+		case "page2":
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok": true,
+				"messages": []map[string]any{
+					{"ts": "111.222", "text": "parent"},
+					{"ts": "555.666", "text": "reply 2", "thread_ts": "111.222"},
+				},
+				"response_metadata": map[string]any{"next_cursor": ""},
+			})
+		default:
+			t.Errorf("unexpected cursor %q", cursor)
+		}
+	})
+
+	msgs, err := c.ConversationsRepliesAll(context.Background(), "C123", "111.222", HistoryOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(msgs) != 3 {
+		t.Fatalf("expected 3 messages, got %d: %+v", len(msgs), msgs)
+	}
+	if msgs[0].Text != "parent" || msgs[1].Text != "reply 1" || msgs[2].Text != "reply 2" {
+		t.Errorf("messages = %+v", msgs)
+	}
+	if len(cursors) != 2 || cursors[1] != "page2" {
+		t.Errorf("cursors = %v", cursors)
+	}
+}
+
+func TestClient_ConversationsRepliesAll_SinglePage(t *testing.T) {
+	var calls atomic.Int32
+	c := testServer(t, func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		json.NewEncoder(w).Encode(map[string]any{
+			"ok": true,
+			"messages": []map[string]any{
+				{"ts": "111.222", "text": "parent"},
+			},
+		})
+	})
+
+	msgs, err := c.ConversationsRepliesAll(context.Background(), "C123", "111.222", HistoryOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(msgs) != 1 {
+		t.Fatalf("expected 1 message, got %d", len(msgs))
+	}
+	if calls.Load() != 1 {
+		t.Errorf("expected 1 call, got %d", calls.Load())
+	}
+}
+
+func TestClient_ConversationsRepliesAll_PreservesAttachments(t *testing.T) {
+	c := testServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"ok":true,"messages":[
+			{"ts":"111.222","text":"","bot_id":"B01","username":"Sentry",
+			 "attachments":[{"title":"PaymentFailed","text":"500 from upstream"}]}
+		]}`))
+	})
+
+	msgs, err := c.ConversationsRepliesAll(context.Background(), "C123", "111.222", HistoryOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(msgs) != 1 {
+		t.Fatalf("expected 1 message, got %d", len(msgs))
+	}
+	if !strings.Contains(string(msgs[0].Attachments), "PaymentFailed") {
+		t.Errorf("attachments = %s", msgs[0].Attachments)
 	}
 }
 

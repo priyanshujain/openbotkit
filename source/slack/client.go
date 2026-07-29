@@ -205,6 +205,36 @@ func (c *Client) ConversationsHistory(ctx context.Context, channel string, opts 
 }
 
 func (c *Client) ConversationsReplies(ctx context.Context, channel, threadTS string, opts HistoryOptions) ([]Message, error) {
+	msgs, _, err := c.repliesPage(ctx, channel, threadTS, opts)
+	return msgs, err
+}
+
+// ConversationsRepliesAll follows next_cursor until the whole thread is fetched.
+func (c *Client) ConversationsRepliesAll(ctx context.Context, channel, threadTS string, opts HistoryOptions) ([]Message, error) {
+	if opts.Limit <= 0 {
+		opts.Limit = 200
+	}
+
+	var all []Message
+	for {
+		msgs, cursor, err := c.repliesPage(ctx, channel, threadTS, opts)
+		if err != nil {
+			return nil, err
+		}
+		// Every page repeats the thread parent; keep it only from the first.
+		if len(all) > 0 && len(msgs) > 0 && msgs[0].TS == all[0].TS {
+			msgs = msgs[1:]
+		}
+		all = append(all, msgs...)
+
+		if cursor == "" {
+			return all, nil
+		}
+		opts.Cursor = cursor
+	}
+}
+
+func (c *Client) repliesPage(ctx context.Context, channel, threadTS string, opts HistoryOptions) ([]Message, string, error) {
 	params := url.Values{
 		"channel": {channel},
 		"ts":      {threadTS},
@@ -218,16 +248,17 @@ func (c *Client) ConversationsReplies(ctx context.Context, channel, threadTS str
 
 	body, err := c.call(ctx, "conversations.replies", params)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	var resp struct {
 		Messages []Message `json:"messages"`
+		apiResponse
 	}
 	if err := json.Unmarshal(body, &resp); err != nil {
-		return nil, fmt.Errorf("parse replies: %w", err)
+		return nil, "", fmt.Errorf("parse replies: %w", err)
 	}
-	return resp.Messages, nil
+	return resp.Messages, resp.Metadata.NextCursor, nil
 }
 
 func (c *Client) ConversationsList(ctx context.Context) ([]Channel, error) {

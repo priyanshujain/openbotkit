@@ -434,6 +434,26 @@ func (c *Client) PostMessage(ctx context.Context, channel, text, threadTS string
 	return resp.TS, nil
 }
 
+// GetPermalink returns the public link to a message. The workspace subdomain
+// is not stored locally, so the link cannot be built without asking Slack.
+func (c *Client) GetPermalink(ctx context.Context, channel, ts string) (string, error) {
+	body, err := c.call(ctx, "chat.getPermalink", url.Values{
+		"channel":    {channel},
+		"message_ts": {ts},
+	})
+	if err != nil {
+		return "", err
+	}
+
+	var resp struct {
+		Permalink string `json:"permalink"`
+	}
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return "", fmt.Errorf("parse permalink: %w", err)
+	}
+	return resp.Permalink, nil
+}
+
 func (c *Client) UpdateMessage(ctx context.Context, channel, ts, text string) error {
 	_, err := c.call(ctx, "chat.update", url.Values{
 		"channel": {channel},

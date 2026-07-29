@@ -549,6 +549,30 @@ func TestClient_DownloadFile_HTTPError(t *testing.T) {
 	}
 }
 
+func TestClient_GetPermalink(t *testing.T) {
+	c := testServer(t, func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+		if r.FormValue("channel") != "C123" {
+			t.Errorf("channel = %q", r.FormValue("channel"))
+		}
+		if r.FormValue("message_ts") != "1785334150.236249" {
+			t.Errorf("message_ts = %q", r.FormValue("message_ts"))
+		}
+		json.NewEncoder(w).Encode(map[string]any{
+			"ok":        true,
+			"permalink": "https://acme.slack.com/archives/C123/p1785334150236249",
+		})
+	})
+
+	link, err := c.GetPermalink(context.Background(), "C123", "1785334150.236249")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if link != "https://acme.slack.com/archives/C123/p1785334150236249" {
+		t.Errorf("permalink = %q", link)
+	}
+}
+
 func TestClient_UpdateMessage(t *testing.T) {
 	c := testServer(t, func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()

@@ -76,6 +76,28 @@ func TestResolveChannel_URL(t *testing.T) {
 	}
 }
 
+func TestResolveChannel_DMID(t *testing.T) {
+	r := NewResolver(&mockAPI{})
+	id, err := r.ResolveChannel(context.Background(), "D0123ABC")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if id != "D0123ABC" {
+		t.Errorf("got %q", id)
+	}
+}
+
+func TestResolveChannel_GroupID(t *testing.T) {
+	r := NewResolver(&mockAPI{})
+	id, err := r.ResolveChannel(context.Background(), "G0123ABC")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if id != "G0123ABC" {
+		t.Errorf("got %q", id)
+	}
+}
+
 func TestResolveChannel_NotFound(t *testing.T) {
 	r := NewResolver(&mockAPI{channels: []Channel{}})
 	_, err := r.ResolveChannel(context.Background(), "#nonexistent")

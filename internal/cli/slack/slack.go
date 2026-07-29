@@ -44,4 +44,5 @@ func init() {
 	Cmd.AddCommand(readCmd)
 	Cmd.AddCommand(threadCmd)
 	Cmd.AddCommand(mediaCmd)
+	Cmd.AddCommand(replyCmd)
 }

@@ -125,17 +125,18 @@ func normalizeHomoglyphs(s string) string {
 // untrustedOutputTools lists tools whose output should be treated as
 // untrusted content (may contain prompt injection attempts).
 var untrustedOutputTools = map[string]bool{
-	"bash":               true,
-	"file_read":          true,
-	"dir_explore":        true,
-	"content_search":     true,
-	"sandbox_exec":       true,
-	"gws_execute":        true,
-	"slack_read_channel": true,
-	"slack_read_thread":  true,
-	"slack_search":       true,
-	"web_search":         true,
-	"web_fetch":          true,
+	"bash":                 true,
+	"file_read":            true,
+	"dir_explore":          true,
+	"content_search":       true,
+	"sandbox_exec":         true,
+	"gws_execute":          true,
+	"slack_read_channel":   true,
+	"slack_read_thread":    true,
+	"slack_search":         true,
+	"slack_media_download": true,
+	"web_search":           true,
+	"web_fetch":            true,
 }
 
 // IsUntrustedTool returns whether a tool's output should be wrapped

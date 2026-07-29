@@ -32,6 +32,13 @@ the thread works: a link to a reply returns the whole thread.`,
 			return fmt.Errorf("pass a permalink, or both --channel-id and --thread-id")
 		}
 
+		// Parse the address before loading credentials, so bad input fails
+		// on its own terms instead of on a missing workspace.
+		ref, flagTS, err := parseThreadAddress(args, threadFlag)
+		if err != nil {
+			return err
+		}
+
 		client, cache, workspace, err := loadClientAndCache()
 		if err != nil {
 			return err
@@ -41,11 +48,7 @@ the thread works: a link to a reply returns the whole thread.`,
 		}
 
 		var channelID, ts string
-		if len(args) == 1 {
-			ref, err := slacksrc.ParsePermalink(args[0])
-			if err != nil {
-				return err
-			}
+		if ref != nil {
 			if !slacksrc.MatchesWorkspace(ref.Subdomain, workspace) {
 				return fmt.Errorf("permalink belongs to workspace %q but obk is authenticated to %q; run: obk slack auth login", ref.Subdomain, workspace)
 			}
@@ -57,9 +60,7 @@ the thread works: a link to a reply returns the whole thread.`,
 			if channelID, err = client.ResolveChannel(cmd.Context(), channelFlag); err != nil {
 				return fmt.Errorf("resolve channel: %w", err)
 			}
-			if ts, err = slacksrc.MessageIDToTS(threadFlag); err != nil {
-				return err
-			}
+			ts = flagTS
 		}
 
 		thread, err := slacksrc.FetchThread(cmd.Context(), client, cache, channelID, ts)
@@ -71,6 +72,23 @@ the thread works: a link to a reply returns the whole thread.`,
 		enc.SetIndent("", "  ")
 		return enc.Encode(thread)
 	},
+}
+
+// parseThreadAddress validates the permalink or --thread-id form. It needs no
+// config or network, so callers run it before loading credentials.
+func parseThreadAddress(args []string, threadFlag string) (*slacksrc.MessageRef, string, error) {
+	if len(args) == 1 {
+		ref, err := slacksrc.ParsePermalink(args[0])
+		if err != nil {
+			return nil, "", err
+		}
+		return ref, "", nil
+	}
+	ts, err := slacksrc.MessageIDToTS(threadFlag)
+	if err != nil {
+		return nil, "", err
+	}
+	return nil, ts, nil
 }
 
 func init() {

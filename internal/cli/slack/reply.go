@@ -34,6 +34,13 @@ confirmation prompt.`,
 			return fmt.Errorf("pass a permalink, or both --channel-id and --thread-id")
 		}
 
+		// Parse the address before loading credentials, so bad input fails
+		// on its own terms instead of on a missing workspace.
+		ref, flagTS, err := parseThreadAddress(args, threadFlag)
+		if err != nil {
+			return err
+		}
+
 		if piped, err := readPipedStdin(); err != nil {
 			return err
 		} else if piped != "" {
@@ -49,11 +56,7 @@ confirmation prompt.`,
 		}
 
 		var channelID, ts string
-		if len(args) == 1 {
-			ref, err := slacksrc.ParsePermalink(args[0])
-			if err != nil {
-				return err
-			}
+		if ref != nil {
 			if !slacksrc.MatchesWorkspace(ref.Subdomain, workspace) {
 				return fmt.Errorf("permalink belongs to workspace %q but obk is authenticated to %q; run: obk slack auth login", ref.Subdomain, workspace)
 			}
@@ -65,9 +68,7 @@ confirmation prompt.`,
 			if channelID, err = client.ResolveChannel(cmd.Context(), channelFlag); err != nil {
 				return fmt.Errorf("resolve channel: %w", err)
 			}
-			if ts, err = slacksrc.MessageIDToTS(threadFlag); err != nil {
-				return err
-			}
+			ts = flagTS
 		}
 
 		// Slack wants the thread parent, so a link to a reply is walked up first.

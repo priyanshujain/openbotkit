@@ -13,8 +13,8 @@ import (
 // subagent model: guarded tools fail, subagent continues.
 type denyInteractor struct{}
 
-func (d *denyInteractor) Notify(_ string) error                { return nil }
-func (d *denyInteractor) NotifyLink(_, _ string) error         { return nil }
+func (d *denyInteractor) Notify(_ string) error        { return nil }
+func (d *denyInteractor) NotifyLink(_, _ string) error { return nil }
 func (d *denyInteractor) RequestApproval(_ string) (bool, error) {
 	return false, errors.New("not permitted in sub-agent context")
 }
@@ -22,12 +22,13 @@ func (d *denyInteractor) RequestApproval(_ string) (bool, error) {
 // SubagentRegistryDeps provides optional dependencies for building
 // an enriched subagent tool registry.
 type SubagentRegistryDeps struct {
-	ScratchDir    string
-	WebDeps       *WebToolDeps
-	LearningsDeps *LearningsDeps
-	ScheduleDeps  *ScheduleToolDeps
-	SlackClient   slack.API
-	Agents        []AgentInfo
+	ScratchDir     string
+	WebDeps        *WebToolDeps
+	LearningsDeps  *LearningsDeps
+	ScheduleDeps   *ScheduleToolDeps
+	SlackClient    slack.API
+	SlackWorkspace string
+	Agents         []AgentInfo
 }
 
 // NewSubagentRegistry creates a tool registry for subagent contexts.
@@ -61,10 +62,15 @@ func NewSubagentRegistry(deps SubagentRegistryDeps) *Registry {
 
 	// Guarded tools — denyInteractor makes them fail via GuardedAction.
 	if deps.SlackClient != nil {
-		readDeps := SlackToolDeps{Client: deps.SlackClient}
+		readDeps := SlackToolDeps{
+			Client:     deps.SlackClient,
+			Workspace:  deps.SlackWorkspace,
+			ScratchDir: deps.ScratchDir,
+		}
 		r.Register(NewSlackSearchTool(readDeps))
 		r.Register(NewSlackReadChannelTool(readDeps))
 		r.Register(NewSlackReadThreadTool(readDeps))
+		r.Register(NewSlackMediaDownloadTool(readDeps))
 		writeDeps := SlackToolDeps{Client: deps.SlackClient, Interactor: deny}
 		r.Register(NewSlackSendTool(writeDeps))
 		r.Register(NewSlackEditTool(writeDeps))
@@ -111,6 +117,7 @@ func BuildSubagentTool(cfg SubagentToolConfig) *SubagentTool {
 	if cfg.SlackWorkspace != "" {
 		if creds, err := slack.LoadCredentials(cfg.SlackWorkspace); err == nil {
 			deps.SlackClient = slack.NewClient(creds.Token, creds.Cookie)
+			deps.SlackWorkspace = cfg.SlackWorkspace
 		}
 	}
 	deps.Agents = DetectAgents()

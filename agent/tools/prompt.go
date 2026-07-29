@@ -121,6 +121,9 @@ Do NOT use bash or skills for web search/fetch — use these tools directly.
 		b.WriteString(`
 ## Slack
 Use the slack_search, slack_read_channel, and slack_read_thread tools for reading Slack content.
+slack_read_thread takes a message permalink and returns the whole thread with names resolved.
+Use slack_media_download to save a message's attachments, then read the file — screenshots usually
+hold the actual error message.
 Use slack_send, slack_edit, and slack_react for write operations (these require user approval).
 Channel references accept: #name, C-ID, or Slack archive URL. User references accept: @handle, U-ID, or email.
 `)

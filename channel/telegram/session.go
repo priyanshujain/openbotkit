@@ -626,10 +626,16 @@ func (sm *SessionManager) registerSlackTools(reg *tools.Registry) {
 		return
 	}
 	client := slacksrc.NewClient(creds.Token, creds.Cookie)
-	deps := tools.SlackToolDeps{Client: client, Interactor: sm.interactor}
+	deps := tools.SlackToolDeps{
+		Client:     client,
+		Interactor: sm.interactor,
+		Workspace:  sm.cfg.Slack.DefaultWorkspace,
+		ScratchDir: config.ScratchDir(sm.sessionID),
+	}
 	reg.Register(tools.NewSlackSearchTool(deps))
 	reg.Register(tools.NewSlackReadChannelTool(deps))
 	reg.Register(tools.NewSlackReadThreadTool(deps))
+	reg.Register(tools.NewSlackMediaDownloadTool(deps))
 	reg.Register(tools.NewSlackSendTool(deps))
 	reg.Register(tools.NewSlackEditTool(deps))
 	reg.Register(tools.NewSlackReactTool(deps))

@@ -114,7 +114,7 @@ var chatCmd = &cobra.Command{
 		registerDelegateTool(toolReg, ch, tracker)
 
 		// Register Slack tools if configured.
-		registerSlackTools(cfg, toolReg, ch)
+		registerSlackTools(cfg, toolReg, ch, scratchDir)
 
 		// Register learnings tools.
 		registerLearningsTools(toolReg)
@@ -207,7 +207,7 @@ func openAuditLogger() *audit.Logger {
 	return audit.OpenDefault(config.AuditJSONLPath())
 }
 
-func registerSlackTools(cfg *config.Config, reg *tools.Registry, ch *clicli.Channel) {
+func registerSlackTools(cfg *config.Config, reg *tools.Registry, ch *clicli.Channel, scratchDir string) {
 	if cfg.Slack == nil || cfg.Slack.DefaultWorkspace == "" {
 		return
 	}
@@ -218,11 +218,17 @@ func registerSlackTools(cfg *config.Config, reg *tools.Registry, ch *clicli.Chan
 	}
 	client := slacksrc.NewClient(creds.Token, creds.Cookie)
 	inter := NewCLIInteractor(ch)
-	deps := tools.SlackToolDeps{Client: client, Interactor: inter}
+	deps := tools.SlackToolDeps{
+		Client:     client,
+		Interactor: inter,
+		Workspace:  cfg.Slack.DefaultWorkspace,
+		ScratchDir: scratchDir,
+	}
 
 	reg.Register(tools.NewSlackSearchTool(deps))
 	reg.Register(tools.NewSlackReadChannelTool(deps))
 	reg.Register(tools.NewSlackReadThreadTool(deps))
+	reg.Register(tools.NewSlackMediaDownloadTool(deps))
 	reg.Register(tools.NewSlackSendTool(deps))
 	reg.Register(tools.NewSlackEditTool(deps))
 	reg.Register(tools.NewSlackReactTool(deps))

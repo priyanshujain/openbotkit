@@ -1,10 +1,12 @@
 package slack
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 )
@@ -255,6 +257,97 @@ func TestClient_ConversationsReplies(t *testing.T) {
 	}
 }
 
+func TestClient_ConversationsRepliesAll_Paginates(t *testing.T) {
+	var cursors []string
+	c := testServer(t, func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+		cursor := r.FormValue("cursor")
+		cursors = append(cursors, cursor)
+
+		switch cursor {
+		case "":
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok": true,
+				"messages": []map[string]any{
+					{"ts": "111.222", "text": "parent"},
+					{"ts": "333.444", "text": "reply 1", "thread_ts": "111.222"},
+				},
+				"has_more":          true,
+				"response_metadata": map[string]any{"next_cursor": "page2"},
+			})
+		case "page2":
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok": true,
+				"messages": []map[string]any{
+					{"ts": "111.222", "text": "parent"},
+					{"ts": "555.666", "text": "reply 2", "thread_ts": "111.222"},
+				},
+				"response_metadata": map[string]any{"next_cursor": ""},
+			})
+		default:
+			t.Errorf("unexpected cursor %q", cursor)
+		}
+	})
+
+	msgs, err := c.ConversationsRepliesAll(context.Background(), "C123", "111.222", HistoryOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(msgs) != 3 {
+		t.Fatalf("expected 3 messages, got %d: %+v", len(msgs), msgs)
+	}
+	if msgs[0].Text != "parent" || msgs[1].Text != "reply 1" || msgs[2].Text != "reply 2" {
+		t.Errorf("messages = %+v", msgs)
+	}
+	if len(cursors) != 2 || cursors[1] != "page2" {
+		t.Errorf("cursors = %v", cursors)
+	}
+}
+
+func TestClient_ConversationsRepliesAll_SinglePage(t *testing.T) {
+	var calls atomic.Int32
+	c := testServer(t, func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		json.NewEncoder(w).Encode(map[string]any{
+			"ok": true,
+			"messages": []map[string]any{
+				{"ts": "111.222", "text": "parent"},
+			},
+		})
+	})
+
+	msgs, err := c.ConversationsRepliesAll(context.Background(), "C123", "111.222", HistoryOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(msgs) != 1 {
+		t.Fatalf("expected 1 message, got %d", len(msgs))
+	}
+	if calls.Load() != 1 {
+		t.Errorf("expected 1 call, got %d", calls.Load())
+	}
+}
+
+func TestClient_ConversationsRepliesAll_PreservesAttachments(t *testing.T) {
+	c := testServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"ok":true,"messages":[
+			{"ts":"111.222","text":"","bot_id":"B01","username":"Sentry",
+			 "attachments":[{"title":"PaymentFailed","text":"500 from upstream"}]}
+		]}`))
+	})
+
+	msgs, err := c.ConversationsRepliesAll(context.Background(), "C123", "111.222", HistoryOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(msgs) != 1 {
+		t.Fatalf("expected 1 message, got %d", len(msgs))
+	}
+	if !strings.Contains(string(msgs[0].Attachments), "PaymentFailed") {
+		t.Errorf("attachments = %s", msgs[0].Attachments)
+	}
+}
+
 func TestClient_ConversationsList(t *testing.T) {
 	c := testServer(t, func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]any{
@@ -321,6 +414,162 @@ func TestClient_UsersInfo(t *testing.T) {
 	}
 	if user.Name != "alice" {
 		t.Errorf("name = %q", user.Name)
+	}
+}
+
+func TestClient_FilesInfo(t *testing.T) {
+	c := testServer(t, func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+		if r.FormValue("file") != "F123" {
+			t.Errorf("file = %q", r.FormValue("file"))
+		}
+		json.NewEncoder(w).Encode(map[string]any{
+			"ok": true,
+			"file": map[string]any{
+				"id":          "F123",
+				"name":        "screenshot.png",
+				"mimetype":    "image/png",
+				"url_private": "https://files.slack.com/files-pri/T1-F123/screenshot.png",
+			},
+		})
+	})
+
+	f, err := c.FilesInfo(context.Background(), "F123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.Name != "screenshot.png" || f.Mimetype != "image/png" {
+		t.Errorf("file = %+v", f)
+	}
+	if f.URLPrivate == "" {
+		t.Error("url_private missing")
+	}
+}
+
+func TestClient_BotsInfo(t *testing.T) {
+	c := testServer(t, func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+		if r.FormValue("bot") != "B123" {
+			t.Errorf("bot = %q", r.FormValue("bot"))
+		}
+		json.NewEncoder(w).Encode(map[string]any{
+			"ok":  true,
+			"bot": map[string]any{"id": "B123", "name": "Sentry"},
+		})
+	})
+
+	b, err := c.BotsInfo(context.Background(), "B123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b.Name != "Sentry" {
+		t.Errorf("name = %q", b.Name)
+	}
+}
+
+func TestClient_DownloadFile(t *testing.T) {
+	var gotAuth string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "image/png")
+		w.Write([]byte("\x89PNG\r\n\x1a\nfake image bytes"))
+	}))
+	defer srv.Close()
+
+	c := NewClient("xoxp-test-token", "")
+	var buf bytes.Buffer
+	if err := c.DownloadFile(context.Background(), srv.URL+"/files-pri/T1-F1/shot.png", &buf); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.HasPrefix(buf.Bytes(), []byte("\x89PNG")) {
+		t.Errorf("body = %q", buf.String())
+	}
+	if gotAuth != "Bearer xoxp-test-token" {
+		t.Errorf("auth = %q", gotAuth)
+	}
+}
+
+func TestClient_DownloadFile_BrowserAuth(t *testing.T) {
+	var gotCookie, gotAuth string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotCookie = r.Header.Get("Cookie")
+		gotAuth = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "image/jpeg")
+		w.Write([]byte("jpegdata"))
+	}))
+	defer srv.Close()
+
+	c := NewClient("xoxc-browser-token", "xoxd-cookie")
+	var buf bytes.Buffer
+	if err := c.DownloadFile(context.Background(), srv.URL+"/shot.jpeg", &buf); err != nil {
+		t.Fatal(err)
+	}
+	if gotCookie != "d=xoxd-cookie" {
+		t.Errorf("cookie = %q", gotCookie)
+	}
+	if gotAuth != "" {
+		t.Errorf("browser download should not send Authorization, got %q", gotAuth)
+	}
+}
+
+// Slack answers an unauthenticated file request with HTTP 200 and a login
+// page; without a content-type check that HTML lands in the output file.
+func TestClient_DownloadFile_HTMLLoginPage(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(200)
+		w.Write([]byte("<!DOCTYPE html><html><body>Sign in to Slack</body></html>"))
+	}))
+	defer srv.Close()
+
+	c := NewClient("xoxc-expired", "stale-cookie")
+	var buf bytes.Buffer
+	err := c.DownloadFile(context.Background(), srv.URL+"/shot.png", &buf)
+	if err == nil {
+		t.Fatal("expected error for HTML login page")
+	}
+	if !strings.Contains(err.Error(), "obk slack auth login") {
+		t.Errorf("error should point at re-auth, got: %v", err)
+	}
+	if buf.Len() != 0 {
+		t.Errorf("nothing should be written on auth failure, got %d bytes", buf.Len())
+	}
+}
+
+func TestClient_DownloadFile_HTTPError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(404)
+	}))
+	defer srv.Close()
+
+	c := NewClient("xoxp-test-token", "")
+	var buf bytes.Buffer
+	if err := c.DownloadFile(context.Background(), srv.URL+"/missing.png", &buf); err == nil {
+		t.Fatal("expected error for HTTP 404")
+	}
+}
+
+func TestClient_GetPermalink(t *testing.T) {
+	c := testServer(t, func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+		if r.FormValue("channel") != "C123" {
+			t.Errorf("channel = %q", r.FormValue("channel"))
+		}
+		if r.FormValue("message_ts") != "1785334150.236249" {
+			t.Errorf("message_ts = %q", r.FormValue("message_ts"))
+		}
+		json.NewEncoder(w).Encode(map[string]any{
+			"ok":        true,
+			"permalink": "https://acme.slack.com/archives/C123/p1785334150236249",
+		})
+	})
+
+	link, err := c.GetPermalink(context.Background(), "C123", "1785334150.236249")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if link != "https://acme.slack.com/archives/C123/p1785334150236249" {
+		t.Errorf("permalink = %q", link)
 	}
 }
 

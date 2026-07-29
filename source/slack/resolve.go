@@ -25,7 +25,7 @@ func NewResolver(api API) *Resolver {
 func (r *Resolver) ResolveChannel(ctx context.Context, ref string) (string, error) {
 	ref = strings.TrimSpace(ref)
 
-	// Already a channel ID (C/G prefix + alphanumeric).
+	// Already a channel ID (C/G/D prefix + alphanumeric).
 	if isChannelID(ref) {
 		return ref, nil
 	}
@@ -111,7 +111,7 @@ func isChannelID(s string) bool {
 	if len(s) < 2 {
 		return false
 	}
-	if s[0] != 'C' && s[0] != 'G' {
+	if s[0] != 'C' && s[0] != 'G' && s[0] != 'D' {
 		return false
 	}
 	for _, c := range s[1:] {

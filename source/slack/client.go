@@ -123,9 +123,9 @@ func (c *Client) SearchMessages(ctx context.Context, query string, opts SearchOp
 
 	var resp struct {
 		Messages struct {
-			Total   int `json:"total"`
-			Page    int `json:"page"`
-			Pages   int `json:"pages"`
+			Total   int       `json:"total"`
+			Page    int       `json:"page"`
+			Pages   int       `json:"pages"`
 			Matches []Message `json:"matches"`
 		} `json:"messages"`
 	}
@@ -205,6 +205,36 @@ func (c *Client) ConversationsHistory(ctx context.Context, channel string, opts 
 }
 
 func (c *Client) ConversationsReplies(ctx context.Context, channel, threadTS string, opts HistoryOptions) ([]Message, error) {
+	msgs, _, err := c.repliesPage(ctx, channel, threadTS, opts)
+	return msgs, err
+}
+
+// ConversationsRepliesAll follows next_cursor until the whole thread is fetched.
+func (c *Client) ConversationsRepliesAll(ctx context.Context, channel, threadTS string, opts HistoryOptions) ([]Message, error) {
+	if opts.Limit <= 0 {
+		opts.Limit = 200
+	}
+
+	var all []Message
+	for {
+		msgs, cursor, err := c.repliesPage(ctx, channel, threadTS, opts)
+		if err != nil {
+			return nil, err
+		}
+		// Every page repeats the thread parent; keep it only from the first.
+		if len(all) > 0 && len(msgs) > 0 && msgs[0].TS == all[0].TS {
+			msgs = msgs[1:]
+		}
+		all = append(all, msgs...)
+
+		if cursor == "" {
+			return all, nil
+		}
+		opts.Cursor = cursor
+	}
+}
+
+func (c *Client) repliesPage(ctx context.Context, channel, threadTS string, opts HistoryOptions) ([]Message, string, error) {
 	params := url.Values{
 		"channel": {channel},
 		"ts":      {threadTS},
@@ -218,16 +248,17 @@ func (c *Client) ConversationsReplies(ctx context.Context, channel, threadTS str
 
 	body, err := c.call(ctx, "conversations.replies", params)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	var resp struct {
 		Messages []Message `json:"messages"`
+		apiResponse
 	}
 	if err := json.Unmarshal(body, &resp); err != nil {
-		return nil, fmt.Errorf("parse replies: %w", err)
+		return nil, "", fmt.Errorf("parse replies: %w", err)
 	}
-	return resp.Messages, nil
+	return resp.Messages, resp.Metadata.NextCursor, nil
 }
 
 func (c *Client) ConversationsList(ctx context.Context) ([]Channel, error) {
@@ -311,6 +342,73 @@ func (c *Client) UsersInfo(ctx context.Context, userID string) (*User, error) {
 	return &resp.User, nil
 }
 
+func (c *Client) FilesInfo(ctx context.Context, fileID string) (*File, error) {
+	body, err := c.call(ctx, "files.info", url.Values{"file": {fileID}})
+	if err != nil {
+		return nil, err
+	}
+
+	var resp struct {
+		File File `json:"file"`
+	}
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, fmt.Errorf("parse file info: %w", err)
+	}
+	return &resp.File, nil
+}
+
+func (c *Client) BotsInfo(ctx context.Context, botID string) (*Bot, error) {
+	body, err := c.call(ctx, "bots.info", url.Values{"bot": {botID}})
+	if err != nil {
+		return nil, err
+	}
+
+	var resp struct {
+		Bot Bot `json:"bot"`
+	}
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, fmt.Errorf("parse bot info: %w", err)
+	}
+	return &resp.Bot, nil
+}
+
+// DownloadFile streams a Slack file URL to w. Slack serves an HTML login page
+// with HTTP 200 when auth fails, so the content type is checked before any
+// bytes reach the writer.
+func (c *Client) DownloadFile(ctx context.Context, rawURL string, w io.Writer) error {
+	req, err := http.NewRequestWithContext(ctx, "GET", rawURL, nil)
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+	if c.isBrowserToken() {
+		req.Header.Set("Cookie", "d="+c.cookie)
+	} else {
+		req.Header.Set("Authorization", "Bearer "+c.token)
+	}
+
+	resp, err := c.downloadClient().Do(req)
+	if err != nil {
+		return fmt.Errorf("download %s: %w", rawURL, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("download %s: HTTP %d", rawURL, resp.StatusCode)
+	}
+	if ct := resp.Header.Get("Content-Type"); strings.HasPrefix(ct, "text/html") {
+		return fmt.Errorf("download %s: got an HTML page instead of the file, credentials are missing or expired; run: obk slack auth login", rawURL)
+	}
+
+	if _, err := io.Copy(w, resp.Body); err != nil {
+		return fmt.Errorf("write file: %w", err)
+	}
+	return nil
+}
+
+func (c *Client) downloadClient() *http.Client {
+	return &http.Client{Timeout: 5 * time.Minute}
+}
+
 // Write methods
 
 func (c *Client) PostMessage(ctx context.Context, channel, text, threadTS string) (string, error) {
@@ -334,6 +432,26 @@ func (c *Client) PostMessage(ctx context.Context, channel, text, threadTS string
 		return "", fmt.Errorf("parse post response: %w", err)
 	}
 	return resp.TS, nil
+}
+
+// GetPermalink returns the public link to a message. The workspace subdomain
+// is not stored locally, so the link cannot be built without asking Slack.
+func (c *Client) GetPermalink(ctx context.Context, channel, ts string) (string, error) {
+	body, err := c.call(ctx, "chat.getPermalink", url.Values{
+		"channel":    {channel},
+		"message_ts": {ts},
+	})
+	if err != nil {
+		return "", err
+	}
+
+	var resp struct {
+		Permalink string `json:"permalink"`
+	}
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return "", fmt.Errorf("parse permalink: %w", err)
+	}
+	return resp.Permalink, nil
 }
 
 func (c *Client) UpdateMessage(ctx context.Context, channel, ts, text string) error {

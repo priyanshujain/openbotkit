@@ -9,6 +9,9 @@ type SlackToolDeps struct {
 	Resolver      *slack.Resolver
 	Interactor    Interactor
 	ApprovalRules *ApprovalRuleSet
+	Workspace     string // enables ID -> name resolution
+	ScratchDir    string // where downloaded media is written
+	UserCache     *slack.UserCache
 }
 
 // SlackResolver returns the shared Resolver, creating one if needed.
@@ -17,6 +20,18 @@ func (d SlackToolDeps) SlackResolver() *slack.Resolver {
 		return d.Resolver
 	}
 	return slack.NewResolver(d.Client)
+}
+
+// SlackUserCache returns the name cache, or nil when no workspace is
+// configured — callers treat nil as "skip name resolution".
+func (d SlackToolDeps) SlackUserCache() *slack.UserCache {
+	if d.UserCache != nil {
+		return d.UserCache
+	}
+	if d.Workspace == "" {
+		return nil
+	}
+	return slack.NewUserCache(d.Workspace, d.Client)
 }
 
 // truncateUTF8 truncates s to at most maxRunes runes, appending "..." if truncated.

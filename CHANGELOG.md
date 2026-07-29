@@ -3,6 +3,13 @@
 All notable changes to OpenBotKit are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.13.0] (2026-07-29)
+
+### Added
+
+- **slack**: Add ConversationsHistoryAll with cursor pagination
+- **slack/cli**: Add export command for full channel JSON export
+
 ## [0.12.0] (2026-04-06)
 
 ### Added

@@ -3,6 +3,7 @@ package telegram
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -10,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gotd/td/telegram/auth"
 	"github.com/gotd/td/telegram/auth/qrlogin"
 	"github.com/gotd/td/tgerr"
 
@@ -360,12 +362,19 @@ func authenticatePassword(ctx context.Context, client *Client, st *authState) er
 		if err == nil {
 			return nil
 		}
-		if tgerr.Is(err, "PASSWORD_HASH_INVALID") {
+		if isWrongPassword(err) {
 			st.setError("Incorrect password, please try again.")
 			continue
 		}
 		return fmt.Errorf("cloud password: %w", err)
 	}
+}
+
+// isWrongPassword reports whether err is a rejected cloud password, which the
+// user can retry, rather than a fatal error. gotd maps PASSWORD_HASH_INVALID to
+// its own sentinel, so checking the RPC error alone would miss it.
+func isWrongPassword(err error) bool {
+	return errors.Is(err, auth.ErrPasswordInvalid) || tgerr.Is(err, "PASSWORD_HASH_INVALID")
 }
 
 // recordSelf stores the signed-in account so status can be reported without a

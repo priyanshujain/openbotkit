@@ -2,11 +2,16 @@ package telegram
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/gotd/td/telegram/auth"
+	"github.com/gotd/td/tgerr"
 )
 
 func TestAuthPageMarkers(t *testing.T) {
@@ -150,6 +155,28 @@ func TestAuthPasswordEndpoint(t *testing.T) {
 		}
 	default:
 		t.Fatal("password was not delivered to the auth goroutine")
+	}
+}
+
+// gotd returns its own sentinel for a rejected cloud password rather than the
+// raw RPC error, so a tgerr-only check would silently fail the whole login
+// instead of letting the user retry.
+func TestIsWrongPassword(t *testing.T) {
+	if !isWrongPassword(auth.ErrPasswordInvalid) {
+		t.Fatal("auth.ErrPasswordInvalid should be retryable")
+	}
+	if !isWrongPassword(fmt.Errorf("check password: %w", auth.ErrPasswordInvalid)) {
+		t.Fatal("a wrapped ErrPasswordInvalid should be retryable")
+	}
+	if !isWrongPassword(tgerr.New(400, "PASSWORD_HASH_INVALID")) {
+		t.Fatal("a raw PASSWORD_HASH_INVALID should be retryable")
+	}
+
+	if isWrongPassword(errors.New("connection reset")) {
+		t.Fatal("an unrelated error must not be treated as a wrong password")
+	}
+	if isWrongPassword(tgerr.New(420, "FLOOD_WAIT")) {
+		t.Fatal("FLOOD_WAIT must not be treated as a wrong password")
 	}
 }
 

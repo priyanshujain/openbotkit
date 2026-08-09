@@ -21,6 +21,7 @@ type Daemon struct {
 	scheduler      *Scheduler
 	skipAppleNotes bool
 	skipWhatsApp   bool
+	skipTelegram   bool
 	skipIMessage   bool
 	skipContacts   bool
 	skipScheduler  bool
@@ -34,6 +35,10 @@ func WithSkipAppleNotes() Option {
 
 func WithSkipWhatsApp() Option {
 	return func(d *Daemon) { d.skipWhatsApp = true }
+}
+
+func WithSkipTelegram() Option {
+	return func(d *Daemon) { d.skipTelegram = true }
 }
 
 func WithSkipIMessage() Option {
@@ -110,7 +115,10 @@ func (d *Daemon) Run(ctx context.Context) error {
 			}
 		}
 	}
-	var anErrCh, imErrCh, ctErrCh <-chan error
+	var anErrCh, imErrCh, ctErrCh, tgErrCh <-chan error
+	if !d.skipTelegram {
+		tgErrCh = runTelegramSync(ctx, d.cfg, notifier)
+	}
 	if !d.skipAppleNotes {
 		anErrCh = runAppleNotesSync(ctx, d.cfg, notifier)
 	}
@@ -129,6 +137,11 @@ func (d *Daemon) Run(ctx context.Context) error {
 	for _, waErrCh := range waErrChs {
 		if err := <-waErrCh; err != nil {
 			slog.Error("whatsapp error during shutdown", "error", err)
+		}
+	}
+	if tgErrCh != nil {
+		if err := <-tgErrCh; err != nil {
+			slog.Error("telegram error during shutdown", "error", err)
 		}
 	}
 	if anErrCh != nil {

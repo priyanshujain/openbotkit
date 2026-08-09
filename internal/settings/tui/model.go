@@ -176,6 +176,9 @@ func (m model) updateBrowse(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.viewport.SetContent(m.renderTree())
 		return m, nil
 
+	case telegramLoginDoneMsg:
+		return m.handleTelegramLoginResult(msg)
+
 	case backupTriggeredMsg:
 		if msg.err != nil {
 			m.flash = fmt.Sprintf("Backup failed: %v", msg.err)
@@ -248,6 +251,11 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 		// X login wizard
 		if f.Key == "x.auth_status" {
 			return m.enterXLogin()
+		}
+
+		// Telegram login runs the QR flow in a browser, so hand over the terminal.
+		if f.Key == "telegram.auth_status" {
+			return m.enterTelegramLogin()
 		}
 
 		// Backup wizard — only when not yet configured.

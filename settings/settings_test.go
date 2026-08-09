@@ -1089,6 +1089,98 @@ func findFieldInNodes(nodes []Node, key string) *Field {
 	return nil
 }
 
+func TestTelegramAuthStatusField(t *testing.T) {
+	// Isolated config dir, so the status does not depend on whether the
+	// machine running the tests happens to be linked.
+	t.Setenv("OBK_CONFIG_DIR", t.TempDir())
+
+	cfg := config.Default()
+	svc := testService(cfg)
+
+	field := findField(svc, "telegram.auth_status")
+	if field == nil {
+		t.Fatal("telegram.auth_status field not found")
+	}
+
+	// Always read-only: pressing Enter dispatches the login flow instead of
+	// editing the value.
+	if field.ReadOnly == nil || !field.ReadOnly(cfg) {
+		t.Fatal("telegram.auth_status must be permanently read-only")
+	}
+
+	// Signing in is pointless without app credentials, so it stays gated.
+	if got := svc.GetValue(field); !strings.Contains(got, "api_id") {
+		t.Fatalf("expected a credentials prompt before setup, got %q", got)
+	}
+
+	apiID := findField(svc, "telegram.api_id")
+	apiHash := findField(svc, "telegram.api_hash")
+	if apiID == nil || apiHash == nil {
+		t.Fatal("telegram credential fields not found")
+	}
+	if err := svc.SetValue(apiID, "1234567"); err != nil {
+		t.Fatalf("set api_id: %v", err)
+	}
+	if err := svc.SetValue(apiHash, "0123456789abcdef0123456789abcdef"); err != nil {
+		t.Fatalf("set api_hash: %v", err)
+	}
+
+	if !IsTelegramConfigured(cfg) {
+		t.Fatal("credentials should be recorded in config")
+	}
+	if got := svc.GetValue(field); !strings.Contains(got, "Not connected") {
+		t.Fatalf("expected a sign-in prompt once configured, got %q", got)
+	}
+
+	// Credentials live in the keyring, never in config.yaml.
+	if cfg.Telegram.APIIDRef != "keychain:obk/telegram/api_id" {
+		t.Fatalf("api_id ref = %q", cfg.Telegram.APIIDRef)
+	}
+	if cfg.Telegram.APIHashRef != "keychain:obk/telegram/api_hash" {
+		t.Fatalf("api_hash ref = %q", cfg.Telegram.APIHashRef)
+	}
+	if got := svc.GetValue(apiHash); strings.Contains(got, "0123456789abcdef0123456789abcdef") {
+		t.Fatalf("api_hash must be masked, got %q", got)
+	}
+}
+
+func TestTelegramAPIIDValidation(t *testing.T) {
+	cfg := config.Default()
+	svc := testService(cfg)
+
+	field := findField(svc, "telegram.api_id")
+	if field == nil {
+		t.Fatal("telegram.api_id field not found")
+	}
+	if err := svc.SetValue(field, "not-a-number"); err == nil {
+		t.Fatal("expected a non-numeric api_id to be rejected")
+	}
+}
+
+func TestTelegramBackfillDaysField(t *testing.T) {
+	cfg := config.Default()
+	svc := testService(cfg)
+
+	field := findField(svc, "telegram.backfill_days")
+	if field == nil {
+		t.Fatal("telegram.backfill_days field not found")
+	}
+	if got := svc.GetValue(field); got != "90" {
+		t.Fatalf("default backfill window = %q, want 90", got)
+	}
+
+	if err := svc.SetValue(field, "30"); err != nil {
+		t.Fatalf("set: %v", err)
+	}
+	if cfg.Telegram.BackfillDays != 30 {
+		t.Fatalf("backfill days = %d", cfg.Telegram.BackfillDays)
+	}
+
+	if err := svc.SetValue(field, "0"); err == nil {
+		t.Fatal("expected a zero backfill window to be rejected")
+	}
+}
+
 func TestXAuthStatusField(t *testing.T) {
 	cfg := config.Default()
 	svc := testService(cfg)

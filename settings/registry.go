@@ -9,6 +9,7 @@ import (
 
 	"github.com/73ai/openbotkit/config"
 	"github.com/73ai/openbotkit/provider"
+	telegramsrc "github.com/73ai/openbotkit/source/telegram"
 	xclient "github.com/73ai/openbotkit/source/twitter/client"
 )
 
@@ -18,7 +19,7 @@ func BuildTree(svc *Service) []Node {
 		{Category: workspaceCategory()},
 		{Category: modelsCategory(svc)},
 		{Category: channelsCategory()},
-		{Category: dataSourcesCategory()},
+		{Category: dataSourcesCategory(svc)},
 		{Category: integrationsCategory()},
 		{Category: backupCategory(svc)},
 		{Category: advancedCategory()},
@@ -549,7 +550,7 @@ func channelsCategory() *Category {
 	}
 }
 
-func dataSourcesCategory() *Category {
+func dataSourcesCategory(svc *Service) *Category {
 	return &Category{
 		Key:   "datasources",
 		Label: "Data Sources",
@@ -690,6 +691,124 @@ func dataSourcesCategory() *Category {
 						Set:      func(c *config.Config, v string) error { return nil },
 						ReadOnly: func(c *config.Config) bool { return true },
 					}},
+				},
+			}},
+			{Category: telegramSourceCategory(svc)},
+		},
+	}
+}
+
+// IsTelegramConfigured reports whether the Telegram app credentials are set.
+// Signing in is pointless without them, so the login entry stays gated.
+func IsTelegramConfigured(c *config.Config) bool {
+	return c.Telegram != nil && c.Telegram.APIIDRef != "" && c.Telegram.APIHashRef != ""
+}
+
+func ensureTelegram(c *config.Config) {
+	if c.Telegram == nil {
+		c.Telegram = &config.TelegramSourceConfig{}
+	}
+	if c.Telegram.Storage.Driver == "" {
+		c.Telegram.Storage.Driver = "sqlite"
+	}
+}
+
+func telegramSourceCategory(svc *Service) *Category {
+	return &Category{
+		Key:   "datasources.telegram",
+		Label: "Telegram",
+		Children: []Node{
+			{Field: &Field{
+				Key:         "telegram.auth_status",
+				Label:       "Account",
+				Description: "Sign in by scanning a QR code in your browser",
+				Type:        TypeString,
+				Get: func(c *config.Config) string {
+					if !IsTelegramConfigured(c) {
+						return "Set api_id and api_hash first"
+					}
+					if telegramsrc.HasSession(c.TelegramSessionPath()) {
+						return "Connected"
+					}
+					return "Not connected (press Enter to sign in)"
+				},
+				Set:      func(c *config.Config, v string) error { return nil },
+				ReadOnly: func(c *config.Config) bool { return true },
+			}},
+			{Field: &Field{
+				Key:         "telegram.api_id",
+				Label:       "api_id",
+				Description: "my.telegram.org -> API development tools",
+				Type:        TypePassword,
+				Get: func(c *config.Config) string {
+					if c.Telegram == nil || c.Telegram.APIIDRef == "" {
+						return "not configured"
+					}
+					return maskCredential(svc, c.Telegram.APIIDRef)
+				},
+				Set: func(c *config.Config, v string) error {
+					if v == "" {
+						return nil
+					}
+					ensureTelegram(c)
+					if err := svc.StoreCredential(telegramsrc.APIIDRef, v); err != nil {
+						return fmt.Errorf("store credential: %w", err)
+					}
+					c.Telegram.APIIDRef = telegramsrc.APIIDRef
+					return nil
+				},
+				Validate: func(v string) error {
+					if v == "" {
+						return nil
+					}
+					if _, err := strconv.Atoi(strings.TrimSpace(v)); err != nil {
+						return fmt.Errorf("api_id must be a number")
+					}
+					return nil
+				},
+			}},
+			{Field: &Field{
+				Key:         "telegram.api_hash",
+				Label:       "api_hash",
+				Description: "Shown next to the api_id on my.telegram.org",
+				Type:        TypePassword,
+				Get: func(c *config.Config) string {
+					if c.Telegram == nil || c.Telegram.APIHashRef == "" {
+						return "not configured"
+					}
+					return maskCredential(svc, c.Telegram.APIHashRef)
+				},
+				Set: func(c *config.Config, v string) error {
+					if v == "" {
+						return nil
+					}
+					ensureTelegram(c)
+					if err := svc.StoreCredential(telegramsrc.APIHashRef, v); err != nil {
+						return fmt.Errorf("store credential: %w", err)
+					}
+					c.Telegram.APIHashRef = telegramsrc.APIHashRef
+					return nil
+				},
+			}},
+			{Field: &Field{
+				Key:         "telegram.backfill_days",
+				Label:       "Backfill Window (days)",
+				Description: "How far back to sync message history",
+				Type:        TypeNumber,
+				Get: func(c *config.Config) string {
+					return strconv.Itoa(c.TelegramBackfillDays())
+				},
+				Set: func(c *config.Config, v string) error {
+					days, err := strconv.Atoi(strings.TrimSpace(v))
+					if err != nil {
+						return fmt.Errorf("invalid number: %w", err)
+					}
+					if days <= 0 {
+						return fmt.Errorf("backfill window must be at least 1 day")
+					}
+					ensureTelegram(c)
+					c.Telegram.BackfillDays = days
+					return nil
 				},
 			}},
 		},

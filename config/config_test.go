@@ -745,7 +745,7 @@ func TestWhatsAppAccountList_LegacyMode(t *testing.T) {
 func TestWhatsAppAccountList_MultiAccount(t *testing.T) {
 	cfg := Default()
 	cfg.WhatsApp.Accounts = map[string]*WhatsAppAccount{
-		"personal": {Role: "source"},
+		"personal":  {Role: "source"},
 		"assistant": {Role: "channel", OwnerJID: "123@s.whatsapp.net"},
 	}
 	entries := cfg.WhatsAppAccountList()

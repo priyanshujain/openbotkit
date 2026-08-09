@@ -269,7 +269,6 @@ func TestProfileDisplaysLabel(t *testing.T) {
 	}
 }
 
-
 func TestProfileNotConfiguredDisplay(t *testing.T) {
 	cfg := &config.Config{}
 	svc := testService(cfg)
@@ -1195,4 +1194,3 @@ func TestXAuthStatusField(t *testing.T) {
 		t.Errorf("unexpected auth status: %q", got)
 	}
 }
-

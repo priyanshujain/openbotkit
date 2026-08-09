@@ -275,9 +275,9 @@ func (g *Gemini) computeCacheHash(req provider.ChatRequest) string {
 
 func (g *Gemini) createCache(ctx context.Context, req provider.ChatRequest) (string, time.Time, error) {
 	cacheBody := map[string]any{
-		"model":            g.cacheModelName(req.Model),
-		"displayName":     "obk-prompt-cache",
-		"expireTime":      time.Now().Add(30 * time.Minute).UTC().Format(time.RFC3339),
+		"model":       g.cacheModelName(req.Model),
+		"displayName": "obk-prompt-cache",
+		"expireTime":  time.Now().Add(30 * time.Minute).UTC().Format(time.RFC3339),
 	}
 
 	if sysText := req.FullSystemText(); sysText != "" {
@@ -647,8 +647,8 @@ type apiContent struct {
 }
 
 type apiPart struct {
-	Text         string        `json:"text,omitempty"`
-	FunctionCall *apiFuncCall  `json:"functionCall,omitempty"`
+	Text         string       `json:"text,omitempty"`
+	FunctionCall *apiFuncCall `json:"functionCall,omitempty"`
 }
 
 type apiFuncCall struct {

@@ -12,11 +12,11 @@ import (
 	"github.com/73ai/openbotkit/agent/tools"
 	clicli "github.com/73ai/openbotkit/channel/cli"
 	"github.com/73ai/openbotkit/config"
-	"github.com/73ai/openbotkit/service/learnings"
 	"github.com/73ai/openbotkit/provider"
 	historysrc "github.com/73ai/openbotkit/service/history"
-	slacksrc "github.com/73ai/openbotkit/source/slack"
+	"github.com/73ai/openbotkit/service/learnings"
 	usagesrc "github.com/73ai/openbotkit/service/usage"
+	slacksrc "github.com/73ai/openbotkit/source/slack"
 	"github.com/73ai/openbotkit/store"
 
 	// Register provider factories.
@@ -30,8 +30,8 @@ import (
 )
 
 var chatCmd = &cobra.Command{
-	Use:   "chat",
-	Short: "Start an interactive chat with the AI assistant",
+	Use:     "chat",
+	Short:   "Start an interactive chat with the AI assistant",
 	Example: `  obk chat`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load()
@@ -201,7 +201,6 @@ func generateSessionID() string {
 	rand.Read(b[:])
 	return fmt.Sprintf("obk-chat-%x", b[:])
 }
-
 
 func openAuditLogger() *audit.Logger {
 	return audit.OpenDefault(config.AuditJSONLPath())

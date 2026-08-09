@@ -12,7 +12,7 @@ func TestClassifyError_StatusCodes(t *testing.T) {
 	}{
 		{&StatusError{Engine: "brave", Code: 429}, FailureRateLimit},
 		{&StatusError{Engine: "duckduckgo", Code: 202}, FailureRateLimit},
-		{&StatusError{Engine: "brave", Code: 202}, FailureTransient},   // 202 is DDG-only
+		{&StatusError{Engine: "brave", Code: 202}, FailureTransient}, // 202 is DDG-only
 		{&StatusError{Engine: "mojeek", Code: 403}, FailureAccessDenied},
 		{&StatusError{Engine: "google", Code: 500}, FailureTransient},
 		{&StatusError{Engine: "bing", Code: 503}, FailureTransient},

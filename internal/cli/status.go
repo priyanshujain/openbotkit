@@ -18,8 +18,8 @@ import (
 	imsrc "github.com/73ai/openbotkit/source/imessage"
 	slacksrc "github.com/73ai/openbotkit/source/slack"
 	tgsrc "github.com/73ai/openbotkit/source/telegram"
-	wasrc "github.com/73ai/openbotkit/source/whatsapp"
 	wssrc "github.com/73ai/openbotkit/source/websearch"
+	wasrc "github.com/73ai/openbotkit/source/whatsapp"
 	"github.com/73ai/openbotkit/store"
 	"github.com/spf13/cobra"
 )

@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	_ "modernc.org/sqlite"
 	"golang.org/x/oauth2"
+	_ "modernc.org/sqlite"
 )
 
 type TokenStore struct {

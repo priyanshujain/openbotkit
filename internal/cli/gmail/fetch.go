@@ -139,4 +139,3 @@ func init() {
 	fetchCmd.Flags().Bool("json", false, "Output as JSON")
 	fetchCmd.Flags().Bool("download-attachments", false, "Save attachments to disk")
 }
-

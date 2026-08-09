@@ -11,8 +11,8 @@ import (
 	"github.com/73ai/openbotkit/config"
 	"github.com/73ai/openbotkit/internal/testutil"
 	"github.com/73ai/openbotkit/provider/gemini"
-	"github.com/73ai/openbotkit/service/memory"
 	historysrc "github.com/73ai/openbotkit/service/history"
+	"github.com/73ai/openbotkit/service/memory"
 )
 
 func TestSession_MessageAndHistorySaved(t *testing.T) {

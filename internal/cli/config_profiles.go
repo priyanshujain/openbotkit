@@ -8,9 +8,9 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/charmbracelet/huh"
 	"github.com/73ai/openbotkit/config"
 	"github.com/73ai/openbotkit/provider"
+	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
 
@@ -121,7 +121,7 @@ var configProfilesShowCmd = &cobra.Command{
 	Short: "Describe a model profile",
 	Example: `  obk config profiles describe claude-all
   obk config profiles describe my-custom-profile`,
-	Args:  cobra.ExactArgs(1),
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
 
@@ -174,8 +174,8 @@ func printProfileDetails(name, label, description, category string, providers []
 }
 
 var configProfilesCreateCmd = &cobra.Command{
-	Use:   "create",
-	Short: "Create a custom model profile",
+	Use:     "create",
+	Short:   "Create a custom model profile",
 	Example: `  obk config profiles create`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load()
@@ -340,7 +340,7 @@ var configProfilesDeleteCmd = &cobra.Command{
 	Short: "Delete a custom model profile",
 	Example: `  obk config profiles delete my-custom-profile
   obk config profiles delete my-custom-profile --force`,
-	Args:  cobra.ExactArgs(1),
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
 

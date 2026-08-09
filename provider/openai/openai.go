@@ -378,8 +378,8 @@ type apiChoice struct {
 }
 
 type apiMessage struct {
-	Role      string       `json:"role"`
-	Content   string       `json:"content"`
+	Role      string        `json:"role"`
+	Content   string        `json:"content"`
 	ToolCalls []apiToolCall `json:"tool_calls,omitempty"`
 }
 
@@ -419,8 +419,8 @@ type sseChoice struct {
 }
 
 type sseDelta struct {
-	Content   string          `json:"content"`
-	ToolCalls []sseToolCall   `json:"tool_calls,omitempty"`
+	Content   string        `json:"content"`
+	ToolCalls []sseToolCall `json:"tool_calls,omitempty"`
 }
 
 type sseToolCall struct {

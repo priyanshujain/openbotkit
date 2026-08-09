@@ -266,7 +266,6 @@ func tierFromKey(key string) string {
 	return ""
 }
 
-
 // ProfilePreview returns a human-readable preview for a profile name.
 func ProfilePreview(name string) string {
 	if name == "custom" {
@@ -286,7 +285,6 @@ func ProfilePreview(name string) string {
 	fmt.Fprintf(&b, "  Providers: %s", strings.Join(p.Providers, ", "))
 	return b.String()
 }
-
 
 // maskCredential loads a credential and returns a masked version like "sk-ant...4x2f".
 func maskCredential(svc *Service, ref string) string {

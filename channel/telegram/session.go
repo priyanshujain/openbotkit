@@ -16,14 +16,14 @@ import (
 	"github.com/73ai/openbotkit/channel"
 	"github.com/73ai/openbotkit/config"
 	"github.com/73ai/openbotkit/internal/skills"
-	"github.com/73ai/openbotkit/service/learnings"
-	"github.com/73ai/openbotkit/service/memory"
 	"github.com/73ai/openbotkit/oauth/google"
 	"github.com/73ai/openbotkit/provider"
 	historysrc "github.com/73ai/openbotkit/service/history"
+	"github.com/73ai/openbotkit/service/learnings"
+	"github.com/73ai/openbotkit/service/memory"
 	"github.com/73ai/openbotkit/service/scheduler"
-	slacksrc "github.com/73ai/openbotkit/source/slack"
 	usagesrc "github.com/73ai/openbotkit/service/usage"
+	slacksrc "github.com/73ai/openbotkit/source/slack"
 )
 
 const sessionTimeout = 15 * time.Minute
@@ -578,8 +578,8 @@ func (sm *SessionManager) registerLearningsTools(reg *tools.Registry) {
 
 	extractDeps := tools.LearningsExtractDeps{
 		LearningsDeps: deps,
-		Provider: sm.provider,
-		Model:    sm.model,
+		Provider:      sm.provider,
+		Model:         sm.model,
 	}
 	reg.Register(tools.NewLearningExtractTool(extractDeps))
 }

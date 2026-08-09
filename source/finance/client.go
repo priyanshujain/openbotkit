@@ -159,4 +159,3 @@ func (c *Client) fetchQuotes(ctx context.Context, symbols []string) ([]Quote, er
 
 	return result.QuoteResponse.Result, nil
 }
-

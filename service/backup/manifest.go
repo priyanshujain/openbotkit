@@ -10,10 +10,10 @@ import (
 )
 
 type Manifest struct {
-	Version   int                    `json:"version"`
-	ID        string                 `json:"id"`
-	Timestamp time.Time              `json:"timestamp"`
-	Hostname  string                 `json:"hostname"`
+	Version   int                     `json:"version"`
+	ID        string                  `json:"id"`
+	Timestamp time.Time               `json:"timestamp"`
+	Hostname  string                  `json:"hostname"`
 	Files     map[string]ManifestFile `json:"files"`
 }
 

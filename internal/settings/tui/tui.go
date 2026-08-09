@@ -3,8 +3,8 @@ package tui
 import (
 	"fmt"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/73ai/openbotkit/settings"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func Run(svc *settings.Service) error {

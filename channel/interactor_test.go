@@ -7,9 +7,9 @@ import (
 )
 
 type mockChannel struct {
-	sent     []string
-	links    []struct{ text, url string }
-	approve  bool
+	sent    []string
+	links   []struct{ text, url string }
+	approve bool
 }
 
 func (m *mockChannel) Send(msg string) error {

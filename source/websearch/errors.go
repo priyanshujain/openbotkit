@@ -9,9 +9,9 @@ import (
 type FailureKind int
 
 const (
-	FailureTransient   FailureKind = iota // timeout, 5xx, connection error
-	FailureRateLimit                      // 429, DDG 202
-	FailureAccessDenied                   // 403
+	FailureTransient    FailureKind = iota // timeout, 5xx, connection error
+	FailureRateLimit                       // 429, DDG 202
+	FailureAccessDenied                    // 403
 )
 
 // StatusError is returned by engines when the HTTP response status is not OK.

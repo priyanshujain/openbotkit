@@ -17,7 +17,7 @@ var dbCmd = &cobra.Command{
   obk db whatsapp "SELECT * FROM messages ORDER BY timestamp DESC LIMIT 5"
   obk db telegram "SELECT count(*) FROM telegram_messages"
   obk db user_memory "SELECT * FROM memories"`,
-	Args:  cobra.ExactArgs(2),
+	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		source := args[0]
 		query := args[1]

@@ -9,8 +9,8 @@ import (
 
 	"github.com/73ai/openbotkit/source"
 	"github.com/73ai/openbotkit/store"
-	gapi "google.golang.org/api/gmail/v1"
 	"golang.org/x/time/rate"
+	gapi "google.golang.org/api/gmail/v1"
 )
 
 type Gmail struct {

@@ -100,8 +100,8 @@ var skillsCreateCmd = &cobra.Command{
 }
 
 var skillsUpdateCmd = &cobra.Command{
-	Use:   "update <name>",
-	Short: "Update an existing custom/external skill",
+	Use:     "update <name>",
+	Short:   "Update an existing custom/external skill",
 	Example: `  obk skills update my-skill --skill-file /path/SKILL.md --ref-file /path/REFERENCE.md`,
 	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

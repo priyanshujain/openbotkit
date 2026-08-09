@@ -12,9 +12,9 @@ import (
 
 	"github.com/73ai/openbotkit/config"
 	"github.com/73ai/openbotkit/internal/testutil"
-	"github.com/73ai/openbotkit/service/memory"
 	"github.com/73ai/openbotkit/provider/gemini"
 	historysrc "github.com/73ai/openbotkit/service/history"
+	"github.com/73ai/openbotkit/service/memory"
 )
 
 // TestSession_MessageAndHistorySaved verifies the full session lifecycle:

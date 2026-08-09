@@ -25,31 +25,31 @@ const authPendingMessage = "I've sent an authorization link. Please tap it to gr
 
 // GWSToolConfig configures a GWSExecuteTool.
 type GWSToolConfig struct {
-	Interactor    Interactor
-	ScopeChecker  ScopeChecker
-	Bridge        *TokenBridge
-	ScopeWaiter   *google.ScopeWaiter
-	Google        *google.Google
-	Account       string
-	Manifest      *skills.Manifest
-	Runner        CommandRunner
-	AuthTimeout   time.Duration
-	ApprovalRules  *ApprovalRuleSet
+	Interactor      Interactor
+	ScopeChecker    ScopeChecker
+	Bridge          *TokenBridge
+	ScopeWaiter     *google.ScopeWaiter
+	Google          *google.Google
+	Account         string
+	Manifest        *skills.Manifest
+	Runner          CommandRunner
+	AuthTimeout     time.Duration
+	ApprovalRules   *ApprovalRuleSet
 	AuthRedirectURL string
 }
 
 // GWSExecuteTool routes all gws commands through a single tool
 // with scope checking, progressive consent, and write approval.
 type GWSExecuteTool struct {
-	interactor    Interactor
-	scopeChecker  ScopeChecker
-	bridge        *TokenBridge
-	scopeWaiter   *google.ScopeWaiter
-	google        *google.Google
-	account       string
-	manifest      *skills.Manifest
-	runner        CommandRunner
-	authTimeout   time.Duration
+	interactor      Interactor
+	scopeChecker    ScopeChecker
+	bridge          *TokenBridge
+	scopeWaiter     *google.ScopeWaiter
+	google          *google.Google
+	account         string
+	manifest        *skills.Manifest
+	runner          CommandRunner
+	authTimeout     time.Duration
 	approvalRules   *ApprovalRuleSet
 	authRedirectURL string
 }
@@ -60,14 +60,14 @@ func NewGWSExecuteTool(cfg GWSToolConfig) *GWSExecuteTool {
 		timeout = defaultAuthTimeout
 	}
 	return &GWSExecuteTool{
-		interactor:    cfg.Interactor,
-		scopeChecker:  cfg.ScopeChecker,
-		bridge:        cfg.Bridge,
-		scopeWaiter:   cfg.ScopeWaiter,
-		google:        cfg.Google,
-		account:       cfg.Account,
-		manifest:      cfg.Manifest,
-		runner:        cfg.Runner,
+		interactor:      cfg.Interactor,
+		scopeChecker:    cfg.ScopeChecker,
+		bridge:          cfg.Bridge,
+		scopeWaiter:     cfg.ScopeWaiter,
+		google:          cfg.Google,
+		account:         cfg.Account,
+		manifest:        cfg.Manifest,
+		runner:          cfg.Runner,
 		authTimeout:     timeout,
 		approvalRules:   cfg.ApprovalRules,
 		authRedirectURL: cfg.AuthRedirectURL,

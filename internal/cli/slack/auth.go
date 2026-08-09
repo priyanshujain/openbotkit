@@ -8,10 +8,10 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/charmbracelet/huh"
 	"github.com/73ai/openbotkit/config"
 	slacksrc "github.com/73ai/openbotkit/source/slack"
 	"github.com/73ai/openbotkit/source/slack/desktop"
+	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
 
@@ -21,8 +21,8 @@ var authCmd = &cobra.Command{
 }
 
 var authLoginCmd = &cobra.Command{
-	Use:   "login",
-	Short: "Authenticate with a Slack workspace",
+	Use:     "login",
+	Short:   "Authenticate with a Slack workspace",
 	Example: `  obk slack auth login`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var authMode string

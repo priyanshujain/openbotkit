@@ -10,8 +10,8 @@ import (
 
 	"github.com/73ai/openbotkit/config"
 	"github.com/73ai/openbotkit/internal/servertest"
-	"github.com/73ai/openbotkit/service/memory"
 	"github.com/73ai/openbotkit/remote"
+	"github.com/73ai/openbotkit/service/memory"
 	ansrc "github.com/73ai/openbotkit/source/applenotes"
 	"github.com/73ai/openbotkit/store"
 )

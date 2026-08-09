@@ -149,18 +149,18 @@ type subEntry struct {
 }
 
 type itemContent struct {
-	ItemType    string      `json:"itemType"`
+	ItemType     string `json:"itemType"`
 	TweetResults *struct {
 		Result tweetResult `json:"result"`
 	} `json:"tweet_results,omitempty"`
 }
 
 type tweetResult struct {
-	TypeName string          `json:"__typename"`
-	RestID   string          `json:"rest_id"`
-	Core     *tweetCore      `json:"core,omitempty"`
-	Legacy   *tweetLegacy    `json:"legacy,omitempty"`
-	Tweet    *tweetResult    `json:"tweet,omitempty"` // for TweetWithVisibilityResults
+	TypeName     string       `json:"__typename"`
+	RestID       string       `json:"rest_id"`
+	Core         *tweetCore   `json:"core,omitempty"`
+	Legacy       *tweetLegacy `json:"legacy,omitempty"`
+	Tweet        *tweetResult `json:"tweet,omitempty"` // for TweetWithVisibilityResults
 	QuotedStatus *struct {
 		Result tweetResult `json:"result"`
 	} `json:"quoted_status_result,omitempty"`
@@ -181,13 +181,13 @@ type userLegacy struct {
 }
 
 type tweetLegacy struct {
-	FullText            string `json:"full_text"`
-	CreatedAt           string `json:"created_at"`
-	ConversationID      string `json:"conversation_id_str"`
-	InReplyToStatusID   string `json:"in_reply_to_status_id_str"`
-	RetweetCount        int    `json:"retweet_count"`
-	FavoriteCount       int    `json:"favorite_count"`
-	ReplyCount          int    `json:"reply_count"`
+	FullText              string `json:"full_text"`
+	CreatedAt             string `json:"created_at"`
+	ConversationID        string `json:"conversation_id_str"`
+	InReplyToStatusID     string `json:"in_reply_to_status_id_str"`
+	RetweetCount          int    `json:"retweet_count"`
+	FavoriteCount         int    `json:"favorite_count"`
+	ReplyCount            int    `json:"reply_count"`
 	RetweetedStatusResult *struct {
 		Result tweetResult `json:"result"`
 	} `json:"retweeted_status_result,omitempty"`

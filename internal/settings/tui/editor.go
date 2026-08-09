@@ -1,8 +1,8 @@
 package tui
 
 import (
-	"github.com/charmbracelet/huh"
 	"github.com/73ai/openbotkit/settings"
+	"github.com/charmbracelet/huh"
 )
 
 func buildForm(f *settings.Field, current string, svc *settings.Service) (*huh.Form, *string, *bool) {

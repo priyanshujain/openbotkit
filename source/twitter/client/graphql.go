@@ -67,9 +67,9 @@ func (c *Client) graphqlPOST(ctx context.Context, opName string, variables, feat
 	}
 
 	body := map[string]any{
-		"variables":    variables,
-		"features":     features,
-		"queryId":      ep.QueryID,
+		"variables": variables,
+		"features":  features,
+		"queryId":   ep.QueryID,
 	}
 	bodyJSON, err := json.Marshal(body)
 	if err != nil {

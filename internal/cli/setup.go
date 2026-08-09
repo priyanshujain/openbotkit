@@ -9,30 +9,30 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/huh"
 	"github.com/73ai/openbotkit/config"
-	backupsvc "github.com/73ai/openbotkit/service/backup"
+	"github.com/73ai/openbotkit/internal/browser/cookies"
 	"github.com/73ai/openbotkit/internal/skills"
 	"github.com/73ai/openbotkit/internal/tty"
 	"github.com/73ai/openbotkit/oauth/google"
 	"github.com/73ai/openbotkit/provider"
-	"github.com/73ai/openbotkit/internal/browser/cookies"
 	"github.com/73ai/openbotkit/remote"
-	ansrc "github.com/73ai/openbotkit/source/applenotes"
-	xclient "github.com/73ai/openbotkit/source/twitter/client"
+	backupsvc "github.com/73ai/openbotkit/service/backup"
 	contactsrc "github.com/73ai/openbotkit/service/contacts"
+	ansrc "github.com/73ai/openbotkit/source/applenotes"
 	imsrc "github.com/73ai/openbotkit/source/imessage"
 	slacksrc "github.com/73ai/openbotkit/source/slack"
 	"github.com/73ai/openbotkit/source/slack/desktop"
+	xclient "github.com/73ai/openbotkit/source/twitter/client"
 	"github.com/73ai/openbotkit/store"
+	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
 
 var gwsServices = []string{"calendar", "drive", "docs", "sheets", "tasks", "people"}
 
 var setupCmd = &cobra.Command{
-	Use:   "setup",
-	Short: "Guided first-time setup for OpenBotKit",
+	Use:     "setup",
+	Short:   "Guided first-time setup for OpenBotKit",
 	Example: `  obk setup`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := tty.RequireInteractive("configure manually with 'obk config' and 'obk gmail auth login'"); err != nil {
@@ -770,7 +770,6 @@ func setupX(cfg *config.Config) error {
 	fmt.Printf("  Authenticated with X (from %s)!\n", browser)
 	return nil
 }
-
 
 func setupSlack(cfg *config.Config) error {
 	fmt.Println("\n  -- Slack Setup --")

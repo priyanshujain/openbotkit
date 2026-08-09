@@ -20,8 +20,8 @@ import (
 )
 
 const (
-	defaultBaseURL  = "https://api.anthropic.com"
-	apiVersion      = "2023-06-01"
+	defaultBaseURL   = "https://api.anthropic.com"
+	apiVersion       = "2023-06-01"
 	vertexAPIVersion = "vertex-2023-10-16"
 )
 
@@ -418,11 +418,11 @@ func (a *Anthropic) parseSSE(body io.ReadCloser, ch chan<- provider.StreamEvent)
 }
 
 type apiResponse struct {
-	Type       string         `json:"type"`
-	Content    []apiContent   `json:"content"`
-	StopReason string         `json:"stop_reason"`
-	Usage      apiUsage       `json:"usage"`
-	Error      apiError       `json:"error"`
+	Type       string       `json:"type"`
+	Content    []apiContent `json:"content"`
+	StopReason string       `json:"stop_reason"`
+	Usage      apiUsage     `json:"usage"`
+	Error      apiError     `json:"error"`
 }
 
 type apiContent struct {
@@ -446,10 +446,10 @@ type apiError struct {
 }
 
 type sseEvent struct {
-	Type         string      `json:"type"`
-	ContentBlock apiContent  `json:"content_block,omitempty"`
-	Delta        sseDelta    `json:"delta,omitempty"`
-	Error        apiError    `json:"error,omitempty"`
+	Type         string     `json:"type"`
+	ContentBlock apiContent `json:"content_block,omitempty"`
+	Delta        sseDelta   `json:"delta,omitempty"`
+	Error        apiError   `json:"error,omitempty"`
 }
 
 type sseDelta struct {

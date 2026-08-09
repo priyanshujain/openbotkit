@@ -7,21 +7,21 @@ import (
 	"strings"
 	"time"
 
+	"github.com/73ai/openbotkit/config"
+	"github.com/73ai/openbotkit/provider"
+	"github.com/73ai/openbotkit/settings"
+	xclient "github.com/73ai/openbotkit/source/twitter/client"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/73ai/openbotkit/config"
-	"github.com/73ai/openbotkit/provider"
-	"github.com/73ai/openbotkit/settings"
-	xclient "github.com/73ai/openbotkit/source/twitter/client"
 )
 
 type state int
 
 const (
-	stateBrowse        state = iota
+	stateBrowse state = iota
 	stateEdit
 	stateProfileSelect
 	stateProviderAuth
@@ -74,20 +74,20 @@ type modelsLoadedMsg struct {
 }
 
 type model struct {
-	svc      *settings.Service
-	rows     []row
-	expanded map[string]bool
-	cursor   int
-	state    state
-	form     *huh.Form
+	svc       *settings.Service
+	rows      []row
+	expanded  map[string]bool
+	cursor    int
+	state     state
+	form      *huh.Form
 	editField *settings.Field
-	editStr  *string
-	editBool *bool
-	flash    string
-	viewport viewport.Model
-	width    int
-	height   int
-	ready    bool
+	editStr   *string
+	editBool  *bool
+	flash     string
+	viewport  viewport.Model
+	width     int
+	height    int
+	ready     bool
 
 	// Wizard state
 	wizardProfile   *string

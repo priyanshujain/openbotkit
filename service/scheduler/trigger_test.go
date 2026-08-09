@@ -123,4 +123,3 @@ func TestCheckTrigger(t *testing.T) {
 		t.Errorf("expected nil match after watermark, got %d rows", len(match.Rows))
 	}
 }
-

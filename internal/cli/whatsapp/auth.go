@@ -19,8 +19,8 @@ var authCmd = &cobra.Command{
 }
 
 var authLoginCmd = &cobra.Command{
-	Use:     "login",
-	Short:   "Authenticate WhatsApp by scanning a QR code",
+	Use:   "login",
+	Short: "Authenticate WhatsApp by scanning a QR code",
 	Example: `  obk whatsapp auth login
   obk whatsapp auth login --account assistant`,
 	RunE: func(cmd *cobra.Command, args []string) error {

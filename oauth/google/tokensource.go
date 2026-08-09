@@ -8,10 +8,10 @@ import (
 )
 
 type dbTokenSource struct {
-	email  string
-	dbPath string
-	base   oauth2.TokenSource
-	mu     sync.Mutex
+	email   string
+	dbPath  string
+	base    oauth2.TokenSource
+	mu      sync.Mutex
 	current *oauth2.Token
 }
 

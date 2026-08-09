@@ -7,12 +7,12 @@ import (
 
 func (c *Client) HomeTimeline(ctx context.Context, count int, cursor string) (json.RawMessage, error) {
 	vars := map[string]any{
-		"count":                     count,
-		"includePromotedContent":    true,
-		"latestControlAvailable":    true,
-		"requestContext":            "launch",
-		"withCommunity":             true,
-		"seenTweetIds":              []string{},
+		"count":                  count,
+		"includePromotedContent": true,
+		"latestControlAvailable": true,
+		"requestContext":         "launch",
+		"withCommunity":          true,
+		"seenTweetIds":           []string{},
 	}
 	if cursor != "" {
 		vars["cursor"] = cursor
@@ -22,12 +22,12 @@ func (c *Client) HomeTimeline(ctx context.Context, count int, cursor string) (js
 
 func (c *Client) HomeLatestTimeline(ctx context.Context, count int, cursor string) (json.RawMessage, error) {
 	vars := map[string]any{
-		"count":                     count,
-		"includePromotedContent":    true,
-		"latestControlAvailable":    true,
-		"requestContext":            "launch",
-		"withCommunity":             true,
-		"seenTweetIds":              []string{},
+		"count":                  count,
+		"includePromotedContent": true,
+		"latestControlAvailable": true,
+		"requestContext":         "launch",
+		"withCommunity":          true,
+		"seenTweetIds":           []string{},
 	}
 	if cursor != "" {
 		vars["cursor"] = cursor

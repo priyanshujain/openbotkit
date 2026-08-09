@@ -64,7 +64,8 @@ var setupCmd = &cobra.Command{
 		var sources []string
 		sourceOptions := []huh.Option[string]{
 			huh.NewOption("LLM Models (for obk chat)", "models"),
-			huh.NewOption("Telegram Bot", "telegram"),
+			huh.NewOption("Telegram Bot (talk to your assistant)", "telegram"),
+			huh.NewOption("Telegram (your account, read + send messages)", "telegram_source"),
 			huh.NewOption("Gmail", "gmail"),
 			huh.NewOption("WhatsApp", "whatsapp"),
 			huh.NewOption("Google Calendar", "calendar"),
@@ -182,6 +183,10 @@ var setupCmd = &cobra.Command{
 				}
 				fmt.Println("\n  WhatsApp requires QR code login.")
 				fmt.Println("  Run after setup: obk whatsapp auth login")
+			case "telegram_source":
+				if err := setupTelegramSource(cfg); err != nil {
+					return err
+				}
 			case "x":
 				if err := setupX(cfg); err != nil {
 					return err
@@ -261,6 +266,8 @@ var setupCmd = &cobra.Command{
 				fmt.Println("    - Slack is ready! Try: obk slack channels")
 			case "telegram":
 				fmt.Println("    - Telegram bot is ready! Send it a message.")
+			case "telegram_source":
+				fmt.Println("    - Run: obk telegram auth login")
 			case "backup":
 				fmt.Println("    - Backup configured! Run `obk backup now` for your first backup.")
 			}

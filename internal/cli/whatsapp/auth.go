@@ -5,11 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
-	"runtime"
 	"strings"
 
 	"github.com/73ai/openbotkit/config"
+	"github.com/73ai/openbotkit/internal/browser"
 	wasrc "github.com/73ai/openbotkit/source/whatsapp"
 	"github.com/spf13/cobra"
 )
@@ -156,10 +155,10 @@ func authLoginRemote(cfg *config.Config) error {
 	}
 
 	url := strings.TrimRight(cfg.Remote.Server, "/") + "/auth/whatsapp"
-	fmt.Printf("Open this URL in your browser to authenticate WhatsApp:\n%s\n", url)
-
-	if runtime.GOOS == "darwin" {
-		_ = exec.Command("open", url).Start()
+	if err := browser.Open(url); err != nil {
+		fmt.Printf("Open this URL in your browser to authenticate WhatsApp:\n%s\n", url)
+	} else {
+		fmt.Printf("Opening this URL in your browser to authenticate WhatsApp:\n%s\n", url)
 	}
 
 	client, err := newRemoteClient(cfg)

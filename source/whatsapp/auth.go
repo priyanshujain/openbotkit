@@ -14,6 +14,7 @@ import (
 
 	"go.mau.fi/whatsmeow/types/events"
 
+	"github.com/73ai/openbotkit/internal/browser"
 	"github.com/73ai/openbotkit/store"
 )
 
@@ -242,8 +243,13 @@ func ServeQR(ctx context.Context, client *Client, addr string, dataDB *store.DB)
 		}
 	}()
 
-	port := ln.Addr().(*net.TCPAddr).Port
-	fmt.Printf("Open http://localhost:%d in your browser to scan the QR code\n", port)
+	url := fmt.Sprintf("http://localhost:%d", ln.Addr().(*net.TCPAddr).Port)
+	if err := browser.Open(url); err != nil {
+		// Headless or unsupported platform: the URL alone is enough.
+		fmt.Printf("Open %s in your browser to scan the QR code\n", url)
+	} else {
+		fmt.Printf("Opening %s in your browser to scan the QR code...\n", url)
+	}
 
 	var historyMsgs atomic.Int64
 	syncSignal := make(chan struct{}, 1)

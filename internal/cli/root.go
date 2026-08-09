@@ -18,6 +18,7 @@ import (
 	websearchcli "github.com/73ai/openbotkit/internal/cli/websearch"
 	whatsappcli "github.com/73ai/openbotkit/internal/cli/whatsapp"
 	xcli "github.com/73ai/openbotkit/internal/cli/x"
+	telegramsrc "github.com/73ai/openbotkit/source/telegram"
 	"github.com/spf13/cobra"
 )
 
@@ -38,6 +39,9 @@ var versionCmd = &cobra.Command{
 }
 
 func init() {
+	// source packages cannot import this one, so push the stamped version out.
+	telegramsrc.SetAppVersion(Version)
+
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(applenotescli.Cmd)
 	rootCmd.AddCommand(backupcli.Cmd)

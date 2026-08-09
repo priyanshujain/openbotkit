@@ -98,6 +98,7 @@ func NewClient(sessionPath string, apiID int, apiHash string, state *StateStorag
 	client := telegram.NewClient(apiID, apiHash, telegram.Options{
 		SessionStorage: &telegram.FileSessionStorage{Path: sessionPath},
 		UpdateHandler:  gaps,
+		Device:         deviceConfig(),
 		Middlewares: []telegram.Middleware{
 			floodwait.NewSimpleWaiter().WithMaxRetries(5),
 			ratelimit.New(rate.Every(100*time.Millisecond), 5),

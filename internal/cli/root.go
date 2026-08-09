@@ -14,6 +14,7 @@ import (
 	imessagecli "github.com/73ai/openbotkit/internal/cli/imessage"
 	memorycli "github.com/73ai/openbotkit/internal/cli/memory"
 	slackcli "github.com/73ai/openbotkit/internal/cli/slack"
+	telegramcli "github.com/73ai/openbotkit/internal/cli/telegram"
 	websearchcli "github.com/73ai/openbotkit/internal/cli/websearch"
 	whatsappcli "github.com/73ai/openbotkit/internal/cli/whatsapp"
 	xcli "github.com/73ai/openbotkit/internal/cli/x"
@@ -49,6 +50,7 @@ func init() {
 	rootCmd.AddCommand(learningscli.Cmd)
 	rootCmd.AddCommand(memorycli.Cmd)
 	rootCmd.AddCommand(slackcli.Cmd)
+	rootCmd.AddCommand(telegramcli.Cmd)
 	rootCmd.AddCommand(websearchcli.Cmd)
 	rootCmd.AddCommand(whatsappcli.Cmd)
 	rootCmd.AddCommand(xcli.Cmd)

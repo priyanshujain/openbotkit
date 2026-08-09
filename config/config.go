@@ -17,30 +17,31 @@ const (
 )
 
 type Config struct {
-	Mode         Mode                `yaml:"mode,omitempty"`
-	Timezone     string              `yaml:"timezone,omitempty"`
-	Workspace    string              `yaml:"workspace,omitempty"`
-	Providers    *ProvidersConfig    `yaml:"providers,omitempty"`
-	Models       *ModelsConfig       `yaml:"models,omitempty"`
-	Remote       *RemoteConfig       `yaml:"remote,omitempty"`
-	Auth         *AuthConfig         `yaml:"auth,omitempty"`
-	Channels     *ChannelsConfig     `yaml:"channels,omitempty"`
-	Gmail        *GmailConfig        `yaml:"gmail,omitempty"`
-	WhatsApp     *WhatsAppConfig     `yaml:"whatsapp,omitempty"`
-	History      *HistoryConfig      `yaml:"history,omitempty"`
-	AppleNotes   *AppleNotesConfig   `yaml:"applenotes,omitempty"`
-	IMessage     *IMessageConfig     `yaml:"imessage,omitempty"`
-	UserMemory   *UserMemoryConfig   `yaml:"user_memory,omitempty"`
-	Daemon       *DaemonConfig       `yaml:"daemon,omitempty"`
-	Usage        *UsageConfig        `yaml:"usage,omitempty"`
-	Integrations *IntegrationsConfig `yaml:"integrations,omitempty"`
-	WebSearch    *WebSearchConfig    `yaml:"websearch,omitempty"`
-	Contacts     *ContactsConfig     `yaml:"contacts,omitempty"`
-	Slack        *SlackConfig        `yaml:"slack,omitempty"`
-	X            *XConfig            `yaml:"x,omitempty"`
-	Scheduler    *SchedulerConfig    `yaml:"scheduler,omitempty"`
-	Tasks        *TasksConfig        `yaml:"tasks,omitempty"`
-	Backup       *BackupConfig       `yaml:"backup,omitempty"`
+	Mode         Mode                  `yaml:"mode,omitempty"`
+	Timezone     string                `yaml:"timezone,omitempty"`
+	Workspace    string                `yaml:"workspace,omitempty"`
+	Providers    *ProvidersConfig      `yaml:"providers,omitempty"`
+	Models       *ModelsConfig         `yaml:"models,omitempty"`
+	Remote       *RemoteConfig         `yaml:"remote,omitempty"`
+	Auth         *AuthConfig           `yaml:"auth,omitempty"`
+	Channels     *ChannelsConfig       `yaml:"channels,omitempty"`
+	Gmail        *GmailConfig          `yaml:"gmail,omitempty"`
+	WhatsApp     *WhatsAppConfig       `yaml:"whatsapp,omitempty"`
+	History      *HistoryConfig        `yaml:"history,omitempty"`
+	AppleNotes   *AppleNotesConfig     `yaml:"applenotes,omitempty"`
+	IMessage     *IMessageConfig       `yaml:"imessage,omitempty"`
+	UserMemory   *UserMemoryConfig     `yaml:"user_memory,omitempty"`
+	Daemon       *DaemonConfig         `yaml:"daemon,omitempty"`
+	Usage        *UsageConfig          `yaml:"usage,omitempty"`
+	Integrations *IntegrationsConfig   `yaml:"integrations,omitempty"`
+	WebSearch    *WebSearchConfig      `yaml:"websearch,omitempty"`
+	Contacts     *ContactsConfig       `yaml:"contacts,omitempty"`
+	Slack        *SlackConfig          `yaml:"slack,omitempty"`
+	X            *XConfig              `yaml:"x,omitempty"`
+	Telegram     *TelegramSourceConfig `yaml:"telegram,omitempty"`
+	Scheduler    *SchedulerConfig      `yaml:"scheduler,omitempty"`
+	Tasks        *TasksConfig          `yaml:"tasks,omitempty"`
+	Backup       *BackupConfig         `yaml:"backup,omitempty"`
 }
 
 func (c *Config) ResolvedMode() Mode {
@@ -163,8 +164,8 @@ type WhatsAppAccount struct {
 }
 
 type WhatsAppConfig struct {
-	Storage  StorageConfig                `yaml:"storage,omitempty"`
-	Accounts map[string]*WhatsAppAccount  `yaml:"accounts,omitempty"`
+	Storage  StorageConfig               `yaml:"storage,omitempty"`
+	Accounts map[string]*WhatsAppAccount `yaml:"accounts,omitempty"`
 }
 
 // WhatsAppAccountEntry is a unified entry for iterating accounts.
@@ -262,6 +263,15 @@ type XConfig struct {
 	Storage StorageConfig `yaml:"storage,omitempty"`
 }
 
+// TelegramSourceConfig configures the Telegram MTProto data source. Distinct
+// from TelegramConfig, which configures the bot channel under Channels.
+type TelegramSourceConfig struct {
+	Storage      StorageConfig `yaml:"storage,omitempty"`
+	APIIDRef     string        `yaml:"api_id_ref,omitempty"`   // e.g. "keychain:obk/telegram/api_id"
+	APIHashRef   string        `yaml:"api_hash_ref,omitempty"` // e.g. "keychain:obk/telegram/api_hash"
+	BackfillDays int           `yaml:"backfill_days,omitempty"`
+}
+
 type SchedulerConfig struct {
 	Storage StorageConfig `yaml:"storage,omitempty"`
 }
@@ -272,7 +282,7 @@ type TasksConfig struct {
 
 type BackupConfig struct {
 	Enabled     bool          `yaml:"enabled,omitempty"`
-	Schedule    string        `yaml:"schedule,omitempty"` // "6h", "12h", "24h", or "" (manual)
+	Schedule    string        `yaml:"schedule,omitempty"`    // "6h", "12h", "24h", or "" (manual)
 	Destination string        `yaml:"destination,omitempty"` // "r2" or "gdrive"
 	R2          *R2Config     `yaml:"r2,omitempty"`
 	GDrive      *GDriveConfig `yaml:"gdrive,omitempty"`
@@ -320,8 +330,10 @@ func (c *Config) SourceDataDSN(source string) (string, error) {
 		return c.TasksDataDSN(), nil
 	case "x":
 		return c.XDataDSN(), nil
+	case "telegram":
+		return c.TelegramDataDSN(), nil
 	default:
-		return "", fmt.Errorf("unknown source: %q (valid: gmail, whatsapp, history, user_memory, applenotes, imessage, usage, websearch, contacts, scheduler, tasks, x)", source)
+		return "", fmt.Errorf("unknown source: %q (valid: gmail, whatsapp, history, user_memory, applenotes, imessage, usage, websearch, contacts, scheduler, tasks, x, telegram)", source)
 	}
 }
 
@@ -430,6 +442,11 @@ func Default() *Config {
 				Driver: "sqlite",
 			},
 		},
+		Telegram: &TelegramSourceConfig{
+			Storage: StorageConfig{
+				Driver: "sqlite",
+			},
+		},
 	}
 	cfg.applyDefaults()
 	return cfg
@@ -516,6 +533,15 @@ func (c *Config) applyDefaults() {
 	}
 	if c.X.Storage.Driver == "" {
 		c.X.Storage.Driver = "sqlite"
+	}
+	if c.Telegram == nil {
+		c.Telegram = &TelegramSourceConfig{}
+	}
+	if c.Telegram.Storage.Driver == "" {
+		c.Telegram.Storage.Driver = "sqlite"
+	}
+	if c.Telegram.BackfillDays == 0 {
+		c.Telegram.BackfillDays = 90
 	}
 	if c.Daemon == nil {
 		c.Daemon = &DaemonConfig{}
@@ -611,6 +637,28 @@ func (c *Config) XDataDSN() string {
 		return c.X.Storage.DSN
 	}
 	return filepath.Join(SourceDir("x"), "data.db")
+}
+
+func (c *Config) TelegramDataDSN() string {
+	if c.Telegram != nil && c.Telegram.Storage.DSN != "" {
+		return c.Telegram.Storage.DSN
+	}
+	return filepath.Join(SourceDir("telegram"), "data.db")
+}
+
+// TelegramSessionPath is the MTProto session file. It lives on disk rather than
+// in the keyring because the daemon reads it on every launchd start, where a
+// locked keychain would be a hard failure.
+func (c *Config) TelegramSessionPath() string {
+	return filepath.Join(SourceDir("telegram"), "session.json")
+}
+
+// TelegramBackfillDays returns the configured backfill window in days.
+func (c *Config) TelegramBackfillDays() int {
+	if c.Telegram != nil && c.Telegram.BackfillDays > 0 {
+		return c.Telegram.BackfillDays
+	}
+	return 90
 }
 
 func (c *Config) JobsDBDSN() string {

@@ -208,6 +208,7 @@ func TestSourceDataDSN_ValidSources(t *testing.T) {
 		{"imessage", filepath.Join("imessage", "data.db")},
 		{"websearch", filepath.Join("websearch", "data.db")},
 		{"scheduler", filepath.Join("scheduler", "data.db")},
+		{"telegram", filepath.Join("telegram", "data.db")},
 	}
 	for _, s := range sources {
 		t.Run(s.name, func(t *testing.T) {
@@ -227,6 +228,60 @@ func TestSourceDataDSN_UnknownSource(t *testing.T) {
 	_, err := cfg.SourceDataDSN("unknown")
 	if err == nil {
 		t.Fatal("expected error for unknown source")
+	}
+}
+
+func TestTelegramSourceDefaults(t *testing.T) {
+	cfg := &Config{}
+	cfg.applyDefaults()
+
+	if cfg.Telegram == nil {
+		t.Fatal("applyDefaults should create Telegram source config")
+	}
+	if cfg.Telegram.Storage.Driver != "sqlite" {
+		t.Fatalf("expected sqlite, got %q", cfg.Telegram.Storage.Driver)
+	}
+	if got := cfg.TelegramBackfillDays(); got != 90 {
+		t.Fatalf("expected 90 day default backfill, got %d", got)
+	}
+
+	if !strings.HasSuffix(cfg.TelegramSessionPath(), filepath.Join("telegram", "session.json")) {
+		t.Fatalf("unexpected session path %q", cfg.TelegramSessionPath())
+	}
+}
+
+// The source config must not collide with the bot channel's telegram config.
+func TestTelegramSourceAndChannelCoexist(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+
+	cfg := Default()
+	cfg.Channels = &ChannelsConfig{Telegram: &TelegramConfig{BotToken: "bot-token", OwnerID: 42}}
+	cfg.Telegram.BackfillDays = 30
+	cfg.Telegram.APIIDRef = "keychain:obk/telegram/api_id"
+
+	if err := cfg.SaveTo(cfgPath); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	loaded, err := LoadFrom(cfgPath)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+
+	if loaded.Channels == nil || loaded.Channels.Telegram == nil {
+		t.Fatal("channel telegram config lost")
+	}
+	if loaded.Channels.Telegram.BotToken != "bot-token" {
+		t.Fatalf("bot token = %q", loaded.Channels.Telegram.BotToken)
+	}
+	if loaded.Telegram == nil {
+		t.Fatal("telegram source config lost")
+	}
+	if loaded.Telegram.BackfillDays != 30 {
+		t.Fatalf("backfill days = %d", loaded.Telegram.BackfillDays)
+	}
+	if loaded.Telegram.APIIDRef != "keychain:obk/telegram/api_id" {
+		t.Fatalf("api id ref = %q", loaded.Telegram.APIIDRef)
 	}
 }
 

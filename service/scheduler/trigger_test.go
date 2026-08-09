@@ -3,7 +3,7 @@ package scheduler
 import "testing"
 
 func TestValidateTriggerSource(t *testing.T) {
-	for _, src := range []string{"gmail", "whatsapp", "imessage", "applenotes"} {
+	for _, src := range []string{"gmail", "whatsapp", "telegram", "imessage", "applenotes"} {
 		if err := ValidateTriggerSource(src); err != nil {
 			t.Errorf("ValidateTriggerSource(%q) = %v, want nil", src, err)
 		}
@@ -26,6 +26,8 @@ func TestValidateTriggerQuery(t *testing.T) {
 		{"valid IS NOT NULL", "gmail", "from_addr IS NOT NULL", false},
 		{"valid IN", "gmail", "from_addr IN ('a@b.com', 'c@d.com')", false},
 		{"valid whatsapp", "whatsapp", "sender_name = 'Alice' AND text LIKE '%meeting%'", false},
+		{"valid telegram", "telegram", "sender_name = 'Alice' AND text LIKE '%meeting%'", false},
+		{"telegram unknown column", "telegram", "chat_jid = 'x'", true},
 		{"empty", "gmail", "", true},
 		{"semicolon", "gmail", "1=1; DROP TABLE emails", true},
 		{"comment", "gmail", "from_addr = 'x' -- comment", true},

@@ -15,6 +15,7 @@ import (
 	"github.com/gotd/td/telegram/auth/qrlogin"
 	"github.com/gotd/td/tgerr"
 
+	"github.com/73ai/openbotkit/internal/browser"
 	"github.com/73ai/openbotkit/store"
 )
 
@@ -284,7 +285,13 @@ func ServeQR(ctx context.Context, client *Client, addr string, db *store.DB) err
 	}()
 	defer server.Shutdown(context.Background())
 
-	fmt.Printf("Open http://localhost:%d in your browser to scan the QR code\n", ln.Addr().(*net.TCPAddr).Port)
+	url := fmt.Sprintf("http://localhost:%d", ln.Addr().(*net.TCPAddr).Port)
+	if err := browser.Open(url); err != nil {
+		// Headless or unsupported platform: the URL alone is enough.
+		fmt.Printf("Open %s in your browser to scan the QR code\n", url)
+	} else {
+		fmt.Printf("Opening %s in your browser to scan the QR code...\n", url)
+	}
 
 	runErr := client.Run(ctx, func(ctx context.Context) error {
 		if err := authenticate(ctx, client, st); err != nil {

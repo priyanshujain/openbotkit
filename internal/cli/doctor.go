@@ -33,6 +33,7 @@ var doctorCmd = &cobra.Command{
 			results = append(results, checkAPIKeys(cfg)...)
 			results = append(results, checkGoogleOAuth(cfg)...)
 			results = append(results, checkWhatsAppSession(cfg)...)
+			results = append(results, checkTelegramSession(cfg)...)
 			results = append(results, checkDatabases(cfg)...)
 		}
 		results = append(results, checkServices()...)
@@ -113,6 +114,14 @@ func checkWhatsAppSession(cfg *config.Config) []checkResult {
 	return []checkResult{{"WhatsApp session", "OK", path}}
 }
 
+func checkTelegramSession(cfg *config.Config) []checkResult {
+	path := cfg.TelegramSessionPath()
+	if _, err := os.Stat(path); err != nil {
+		return []checkResult{{"Telegram session", "WARN", "no session file"}}
+	}
+	return []checkResult{{"Telegram session", "OK", path}}
+}
+
 type dbCheck struct {
 	name string
 	path string
@@ -122,6 +131,7 @@ func checkDatabases(cfg *config.Config) []checkResult {
 	dbs := []dbCheck{
 		{"Gmail DB", cfg.GmailDataDSN()},
 		{"WhatsApp DB", cfg.WhatsAppDataDSN()},
+		{"Telegram DB", cfg.TelegramDataDSN()},
 		{"History DB", cfg.HistoryDataDSN()},
 		{"UserMemory DB", cfg.UserMemoryDataDSN()},
 		{"AppleNotes DB", cfg.AppleNotesDataDSN()},

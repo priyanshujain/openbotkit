@@ -27,7 +27,13 @@ func Live(ctx context.Context, client *Client, db *store.DB, opts LiveOptions) e
 		return fmt.Errorf("migrate schema: %w", err)
 	}
 
-	registerUpdateHandlers(client.Dispatcher(), db, opts.OnChange)
+	// The account was recorded at login; without it, outgoing private messages
+	// would land with an empty sender_id.
+	selfID, _, err := LoadSelf(db)
+	if err != nil {
+		slog.Warn("telegram: could not read the stored account", "error", err)
+	}
+	registerUpdateHandlers(client.Dispatcher(), db, selfID, opts.OnChange)
 
 	return client.Run(ctx, func(ctx context.Context) error {
 		self, err := client.TG().Self(ctx)
@@ -49,7 +55,7 @@ func Live(ctx context.Context, client *Client, db *store.DB, opts LiveOptions) e
 	})
 }
 
-func registerUpdateHandlers(d tg.UpdateDispatcher, db *store.DB, onChange func()) {
+func registerUpdateHandlers(d tg.UpdateDispatcher, db *store.DB, selfID int64, onChange func()) {
 	notify := func(changed bool) {
 		if changed && onChange != nil {
 			onChange()
@@ -57,22 +63,22 @@ func registerUpdateHandlers(d tg.UpdateDispatcher, db *store.DB, onChange func()
 	}
 
 	d.OnNewMessage(func(ctx context.Context, e tg.Entities, u *tg.UpdateNewMessage) error {
-		notify(storeUpdateMessage(db, e, u.Message))
+		notify(storeUpdateMessage(db, selfID, e, u.Message))
 		return nil
 	})
 
 	d.OnNewChannelMessage(func(ctx context.Context, e tg.Entities, u *tg.UpdateNewChannelMessage) error {
-		notify(storeUpdateMessage(db, e, u.Message))
+		notify(storeUpdateMessage(db, selfID, e, u.Message))
 		return nil
 	})
 
 	d.OnEditMessage(func(ctx context.Context, e tg.Entities, u *tg.UpdateEditMessage) error {
-		notify(storeUpdateMessage(db, e, u.Message))
+		notify(storeUpdateMessage(db, selfID, e, u.Message))
 		return nil
 	})
 
 	d.OnEditChannelMessage(func(ctx context.Context, e tg.Entities, u *tg.UpdateEditChannelMessage) error {
-		notify(storeUpdateMessage(db, e, u.Message))
+		notify(storeUpdateMessage(db, selfID, e, u.Message))
 		return nil
 	})
 
@@ -97,7 +103,7 @@ func registerUpdateHandlers(d tg.UpdateDispatcher, db *store.DB, onChange func()
 
 // storeUpdateMessage writes an update's message and the entities it references.
 // It reports whether a row was written.
-func storeUpdateMessage(db *store.DB, e tg.Entities, raw tg.MessageClass) bool {
+func storeUpdateMessage(db *store.DB, selfID int64, e tg.Entities, raw tg.MessageClass) bool {
 	ents := peer.EntitiesFromUpdate(e)
 	if err := saveEntities(db, ents); err != nil {
 		slog.Error("telegram: save entities", "error", err)
@@ -112,7 +118,7 @@ func storeUpdateMessage(db *store.DB, e tg.Entities, raw tg.MessageClass) bool {
 		return false
 	}
 
-	msg, ok := messageFromTG(notEmpty, chatID)
+	msg, ok := messageFromTG(notEmpty, chatID, selfID)
 	if !ok {
 		return false
 	}

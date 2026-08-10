@@ -443,7 +443,7 @@ func TestSyncDialogsSkipsHistory(t *testing.T) {
 }
 
 func TestMessageFromTGSkipsServiceMessages(t *testing.T) {
-	if _, ok := messageFromTG(&tg.MessageService{ID: 1}, 100); ok {
+	if _, ok := messageFromTG(&tg.MessageService{ID: 1}, 100, 0); ok {
 		t.Fatal("service messages should not be stored")
 	}
 }
@@ -458,7 +458,7 @@ func TestMessageFromTGFields(t *testing.T) {
 	m.SetEditDate(int(edited.Unix()))
 	m.SetMedia(&tg.MessageMediaPhoto{})
 
-	got, ok := messageFromTG(m, ChatIDFromUser(11))
+	got, ok := messageFromTG(m, ChatIDFromUser(11), 99)
 	if !ok {
 		t.Fatal("expected a storable message")
 	}
@@ -473,5 +473,42 @@ func TestMessageFromTGFields(t *testing.T) {
 	}
 	if got.EditDate == nil || !got.EditDate.Equal(edited) {
 		t.Fatalf("edit_date = %v, want %v", got.EditDate, edited)
+	}
+}
+
+// Backfill fills in the sender for outgoing private messages the same way the
+// send path does, so history from the phone and from obk agree.
+func TestBackfillOutgoingPrivateMessageRecordsSelfAsSender(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+
+	const selfID int64 = 99
+	if err := SaveSelf(db, selfID, "me"); err != nil {
+		t.Fatalf("save self: %v", err)
+	}
+
+	now := time.Now().UTC().Truncate(time.Second)
+	ann := &tg.User{ID: 11, AccessHash: 1111, FirstName: "Ann"}
+	sent := tgMessage(20, now, "on my way", func(m *tg.Message) { m.Out = true })
+	d, hist := userDialog(ann, sent)
+
+	f := &fakeFetcher{
+		dialogs: []dialogs.Elem{d},
+		history: map[int64][]messages.Elem{ChatIDFromUser(11): hist},
+	}
+
+	if _, err := Backfill(ctx, f, db, BackfillOptions{}); err != nil {
+		t.Fatalf("backfill: %v", err)
+	}
+
+	msgs, err := ListMessages(db, ListOptions{ChatID: ChatIDFromUser(11)})
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(msgs) != 1 {
+		t.Fatalf("expected 1 message, got %d", len(msgs))
+	}
+	if msgs[0].SenderID != selfID {
+		t.Fatalf("sender_id = %d, want the account's own ID %d", msgs[0].SenderID, selfID)
 	}
 }

@@ -157,8 +157,11 @@ func ChatIDFromPeer(p tg.PeerClass) (int64, bool) {
 }
 
 // messageFromTG converts a message into a storable row. Service messages and
-// empty messages report false.
-func messageFromTG(m tg.NotEmptyMessage, chatID int64) (*Message, bool) {
+// empty messages report false. selfID stands in for the sender of outgoing
+// private messages, which Telegram sends without a from_id; without it the
+// same message would carry a different sender_id depending on whether it came
+// from this machine or from the phone.
+func messageFromTG(m tg.NotEmptyMessage, chatID, selfID int64) (*Message, bool) {
 	msg, ok := m.(*tg.Message)
 	if !ok {
 		return nil, false
@@ -177,11 +180,11 @@ func messageFromTG(m tg.NotEmptyMessage, chatID int64) (*Message, bool) {
 		if u, ok := from.(*tg.PeerUser); ok {
 			out.SenderID = u.UserID
 		}
-	} else if !msg.Out {
+	} else if msg.Out {
+		out.SenderID = selfID
+	} else if kind, rawID := SplitChatID(chatID); kind == PeerUser {
 		// One-to-one incoming messages omit from_id; the peer is the sender.
-		if kind, rawID := SplitChatID(chatID); kind == PeerUser {
-			out.SenderID = rawID
-		}
+		out.SenderID = rawID
 	}
 
 	if reply, ok := msg.GetReplyTo(); ok {

@@ -79,13 +79,18 @@ func Backfill(ctx context.Context, f Fetcher, db *store.DB, opts BackfillOptions
 
 	result := &BackfillResult{}
 
+	selfID, _, err := LoadSelf(db)
+	if err != nil {
+		slog.Warn("telegram: could not read the stored account", "error", err)
+	}
+
 	type target struct {
 		peer tg.InputPeerClass
 		chat *Chat
 	}
 	var targets []target
 
-	err := f.Dialogs(ctx, func(ctx context.Context, elem dialogs.Elem) error {
+	err = f.Dialogs(ctx, func(ctx context.Context, elem dialogs.Elem) error {
 		if err := saveEntities(db, elem.Entities); err != nil {
 			return err
 		}
@@ -105,7 +110,7 @@ func Backfill(ctx context.Context, f Fetcher, db *store.DB, opts BackfillOptions
 	}
 
 	for _, t := range targets {
-		n, err := backfillChat(ctx, f, db, t.peer, t.chat, opts)
+		n, err := backfillChat(ctx, f, db, t.peer, t.chat, selfID, opts)
 		result.Messages += n
 		if err != nil {
 			slog.Error("telegram: backfill chat", "chat_id", t.chat.ChatID, "error", err)
@@ -116,7 +121,7 @@ func Backfill(ctx context.Context, f Fetcher, db *store.DB, opts BackfillOptions
 	return result, nil
 }
 
-func backfillChat(ctx context.Context, f Fetcher, db *store.DB, peer tg.InputPeerClass, chat *Chat, opts BackfillOptions) (int, error) {
+func backfillChat(ctx context.Context, f Fetcher, db *store.DB, peer tg.InputPeerClass, chat *Chat, selfID int64, opts BackfillOptions) (int, error) {
 	state, err := GetSyncState(db, chat.ChatID)
 	if err != nil {
 		return 0, fmt.Errorf("get sync state: %w", err)
@@ -137,7 +142,7 @@ func backfillChat(ctx context.Context, f Fetcher, db *store.DB, peer tg.InputPee
 			return err
 		}
 
-		msg, ok := messageFromTG(elem.Msg, chat.ChatID)
+		msg, ok := messageFromTG(elem.Msg, chat.ChatID, selfID)
 		if !ok {
 			return nil
 		}

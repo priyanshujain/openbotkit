@@ -12,7 +12,7 @@ func TestLiveNewMessageIsStored(t *testing.T) {
 	db := testDB(t)
 	changes := 0
 	d := tg.NewUpdateDispatcher()
-	registerUpdateHandlers(d, db, func() { changes++ })
+	registerUpdateHandlers(d, db, 0, func() { changes++ })
 
 	now := time.Now().UTC().Truncate(time.Second)
 	ann := &tg.User{ID: 11, AccessHash: 1111, FirstName: "Ann", LastName: "Lee"}
@@ -62,7 +62,7 @@ func TestLiveNewMessageIsStored(t *testing.T) {
 func TestLiveChannelMessageIsStored(t *testing.T) {
 	db := testDB(t)
 	d := tg.NewUpdateDispatcher()
-	registerUpdateHandlers(d, db, nil)
+	registerUpdateHandlers(d, db, 0, nil)
 
 	now := time.Now().UTC().Truncate(time.Second)
 	channel := &tg.Channel{ID: 41, AccessHash: 4141, Title: "Eng"}
@@ -87,10 +87,49 @@ func TestLiveChannelMessageIsStored(t *testing.T) {
 	}
 }
 
+// Telegram omits from_id on outgoing private messages. Leaving sender_id at 0
+// would give the same message a different sender depending on whether it was
+// sent from the phone or through obk, and break joins against telegram_users.
+func TestLiveOutgoingPrivateMessageRecordsSelfAsSender(t *testing.T) {
+	db := testDB(t)
+	const selfID int64 = 99
+	d := tg.NewUpdateDispatcher()
+	registerUpdateHandlers(d, db, selfID, nil)
+
+	if err := UpsertUser(db, &User{UserID: selfID, FirstName: "Me"}); err != nil {
+		t.Fatalf("seed self: %v", err)
+	}
+
+	ann := &tg.User{ID: 11, FirstName: "Ann"}
+	msg := &tg.Message{ID: 5, Date: int(time.Now().Unix()), Message: "on my way", Out: true}
+	msg.PeerID = &tg.PeerUser{UserID: ann.ID}
+
+	if err := d.Handle(context.Background(), &tg.Updates{
+		Updates: []tg.UpdateClass{&tg.UpdateNewMessage{Message: msg}},
+		Users:   []tg.UserClass{ann},
+	}); err != nil {
+		t.Fatalf("handle: %v", err)
+	}
+
+	msgs, err := ListMessages(db, ListOptions{ChatID: ChatIDFromUser(11)})
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(msgs) != 1 {
+		t.Fatalf("expected 1 message, got %d", len(msgs))
+	}
+	if msgs[0].SenderID != selfID {
+		t.Fatalf("sender_id = %d, want the account's own ID %d", msgs[0].SenderID, selfID)
+	}
+	if msgs[0].SenderName != "Me" {
+		t.Fatalf("sender_name = %q", msgs[0].SenderName)
+	}
+}
+
 func TestLiveEditUpdatesExistingRow(t *testing.T) {
 	db := testDB(t)
 	d := tg.NewUpdateDispatcher()
-	registerUpdateHandlers(d, db, nil)
+	registerUpdateHandlers(d, db, 0, nil)
 
 	now := time.Now().UTC().Truncate(time.Second)
 	ann := &tg.User{ID: 11, FirstName: "Ann"}
@@ -132,7 +171,7 @@ func TestLiveEditUpdatesExistingRow(t *testing.T) {
 func TestLiveDeleteRemovesRows(t *testing.T) {
 	db := testDB(t)
 	d := tg.NewUpdateDispatcher()
-	registerUpdateHandlers(d, db, nil)
+	registerUpdateHandlers(d, db, 0, nil)
 
 	now := time.Now().UTC()
 	userChat := ChatIDFromUser(11)
@@ -172,7 +211,7 @@ func TestLiveIgnoresServiceMessages(t *testing.T) {
 	db := testDB(t)
 	changes := 0
 	d := tg.NewUpdateDispatcher()
-	registerUpdateHandlers(d, db, func() { changes++ })
+	registerUpdateHandlers(d, db, 0, func() { changes++ })
 
 	svc := &tg.MessageService{ID: 3, Date: int(time.Now().Unix())}
 	svc.PeerID = &tg.PeerUser{UserID: 11}

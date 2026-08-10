@@ -141,12 +141,13 @@ var chatsListCmd = &cobra.Command{
 
 		jsonOut, _ := cmd.Flags().GetBool("json")
 		query, _ := cmd.Flags().GetString("search")
+		limit, _ := cmd.Flags().GetInt("limit")
 
 		var chats []tgsrc.Chat
 		if query != "" {
-			chats, err = tgsrc.FindChats(db, query, 0)
+			chats, err = tgsrc.FindChats(db, query, limit)
 		} else {
-			chats, err = tgsrc.ListChats(db)
+			chats, err = tgsrc.ListChats(db, limit)
 		}
 		if err != nil {
 			return fmt.Errorf("list chats: %w", err)
@@ -194,5 +195,6 @@ func init() {
 
 	chatsListCmd.Flags().Bool("json", false, "Output as JSON")
 	chatsListCmd.Flags().String("search", "", "Filter chats by title or username")
+	chatsListCmd.Flags().Int("limit", 0, "Maximum number of results (0 for no limit)")
 	chatsCmd.AddCommand(chatsListCmd)
 }

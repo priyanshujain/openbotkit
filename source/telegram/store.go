@@ -154,8 +154,17 @@ func scanChats(rows *sql.Rows) ([]Chat, error) {
 	return chats, rows.Err()
 }
 
-func ListChats(db *store.DB) ([]Chat, error) {
-	rows, err := db.Query("SELECT " + chatColumns + " FROM telegram_chats ORDER BY last_message_at DESC")
+// ListChats returns every chat, newest activity first. A limit of 0 means no
+// limit, as it does for FindChats.
+func ListChats(db *store.DB, limit int) ([]Chat, error) {
+	query := "SELECT " + chatColumns + " FROM telegram_chats ORDER BY last_message_at DESC"
+	var args []any
+	if limit > 0 {
+		query += " LIMIT ?"
+		args = append(args, limit)
+	}
+
+	rows, err := db.Query(db.Rebind(query), args...)
 	if err != nil {
 		return nil, fmt.Errorf("list chats: %w", err)
 	}
@@ -163,19 +172,21 @@ func ListChats(db *store.DB) ([]Chat, error) {
 	return scanChats(rows)
 }
 
-// FindChats matches chats by a fragment of their title or username. It is a
-// search, not a send target: use ChatsByUsername or ChatsByTitle for that.
+// FindChats matches chats by a fragment of their title or username, with 0
+// meaning no limit. It is a search, not a send target: use ChatsByUsername or
+// ChatsByTitle for that.
 func FindChats(db *store.DB, query string, limit int) ([]Chat, error) {
-	if limit <= 0 {
-		limit = 20
-	}
 	pattern := likePattern(query)
-	rows, err := db.Query(
-		db.Rebind(`SELECT `+chatColumns+` FROM telegram_chats
-			WHERE LOWER(title) LIKE ? ESCAPE '\' OR LOWER(username) LIKE ? ESCAPE '\'
-			ORDER BY last_message_at DESC LIMIT ?`),
-		pattern, pattern, limit,
-	)
+	stmt := `SELECT ` + chatColumns + ` FROM telegram_chats
+		WHERE LOWER(title) LIKE ? ESCAPE '\' OR LOWER(username) LIKE ? ESCAPE '\'
+		ORDER BY last_message_at DESC`
+	args := []any{pattern, pattern}
+	if limit > 0 {
+		stmt += " LIMIT ?"
+		args = append(args, limit)
+	}
+
+	rows, err := db.Query(db.Rebind(stmt), args...)
 	if err != nil {
 		return nil, fmt.Errorf("find chats: %w", err)
 	}

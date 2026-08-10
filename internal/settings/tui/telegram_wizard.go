@@ -22,7 +22,7 @@ type telegramLoginDoneMsg struct {
 // the real command is both simpler and better tested than reimplementing it
 // inside the settings TUI.
 func (m model) enterTelegramLogin() (tea.Model, tea.Cmd) {
-	if !settings.IsTelegramConfigured(m.svc.Config()) {
+	if !settings.IsTelegramConfigured() {
 		m.flash = "Set api_id and api_hash first"
 		m.viewport.SetContent(m.renderTree())
 		return m, tea.Tick(3*time.Second, func(time.Time) tea.Msg { return flashMsg{} })

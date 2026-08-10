@@ -696,10 +696,13 @@ func dataSourcesCategory(svc *Service) *Category {
 	}
 }
 
-// IsTelegramConfigured reports whether the Telegram app credentials are set.
-// Signing in is pointless without them, so the login entry stays gated.
-func IsTelegramConfigured(c *config.Config) bool {
-	return c.Telegram != nil && c.Telegram.APIIDRef != "" && c.Telegram.APIHashRef != ""
+// IsTelegramConfigured reports whether the Telegram app credentials can be
+// resolved. Signing in is pointless without them, so the login entry stays
+// gated. The source package owns the answer, because it also covers the
+// TELEGRAM_API_ID/TELEGRAM_API_HASH environment variables that headless setups
+// use and that a config ref knows nothing about.
+func IsTelegramConfigured() bool {
+	return telegramsrc.HasCredentials()
 }
 
 func ensureTelegram(c *config.Config) {
@@ -722,7 +725,7 @@ func telegramSourceCategory(svc *Service) *Category {
 				Description: "Sign in by scanning a QR code in your browser",
 				Type:        TypeString,
 				Get: func(c *config.Config) string {
-					if !IsTelegramConfigured(c) {
+					if !IsTelegramConfigured() {
 						return "Set api_id and api_hash first"
 					}
 					if telegramsrc.HasSession(c.TelegramSessionPath()) {

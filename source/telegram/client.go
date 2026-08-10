@@ -48,6 +48,15 @@ func Credentials() (int, string, error) {
 	return id, hash, nil
 }
 
+// HasCredentials reports whether an api_id and api_hash can be resolved at
+// all, from the keyring or the environment. It is the single answer to "is
+// Telegram configured": checking a config ref instead would call a working
+// headless setup unconfigured and block login.
+func HasCredentials() bool {
+	_, _, err := Credentials()
+	return err == nil
+}
+
 func parseAPIID(raw string) (int, error) {
 	id, err := strconv.Atoi(strings.TrimSpace(raw))
 	if err != nil {

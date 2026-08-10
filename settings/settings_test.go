@@ -8,6 +8,7 @@ import (
 
 	"github.com/73ai/openbotkit/config"
 	"github.com/73ai/openbotkit/provider"
+	"github.com/zalando/go-keyring"
 )
 
 func testService(cfg *config.Config) *Service {
@@ -1092,9 +1093,18 @@ func TestTelegramAuthStatusField(t *testing.T) {
 	// Isolated config dir, so the status does not depend on whether the
 	// machine running the tests happens to be linked.
 	t.Setenv("OBK_CONFIG_DIR", t.TempDir())
+	// The gate asks whether credentials resolve, so the keyring and the
+	// environment both have to be this test's own.
+	keyring.MockInit()
+	t.Setenv("TELEGRAM_API_ID", "")
+	t.Setenv("TELEGRAM_API_HASH", "")
 
 	cfg := config.Default()
-	svc := testService(cfg)
+	svc := New(cfg,
+		WithSaveFn(func(*config.Config) error { return nil }),
+		WithStoreCred(provider.StoreCredential),
+		WithLoadCred(provider.LoadCredential),
+	)
 
 	field := findField(svc, "telegram.auth_status")
 	if field == nil {
@@ -1124,7 +1134,7 @@ func TestTelegramAuthStatusField(t *testing.T) {
 		t.Fatalf("set api_hash: %v", err)
 	}
 
-	if !IsTelegramConfigured(cfg) {
+	if !IsTelegramConfigured() {
 		t.Fatal("credentials should be recorded in config")
 	}
 	if got := svc.GetValue(field); !strings.Contains(got, "Not connected") {
@@ -1153,6 +1163,30 @@ func TestTelegramAPIIDValidation(t *testing.T) {
 	}
 	if err := svc.SetValue(field, "not-a-number"); err == nil {
 		t.Fatal("expected a non-numeric api_id to be rejected")
+	}
+}
+
+// A headless install configures Telegram through the environment, which no
+// config ref records. Calling that unconfigured blocks login on a setup that
+// works.
+func TestTelegramConfiguredFromEnvironment(t *testing.T) {
+	t.Setenv("OBK_CONFIG_DIR", t.TempDir())
+	keyring.MockInit()
+	t.Setenv("TELEGRAM_API_ID", "1234567")
+	t.Setenv("TELEGRAM_API_HASH", "0123456789abcdef0123456789abcdef")
+
+	cfg := config.Default()
+	if !IsTelegramConfigured() {
+		t.Fatal("credentials from the environment must count as configured")
+	}
+
+	svc := testService(cfg)
+	field := findField(svc, "telegram.auth_status")
+	if field == nil {
+		t.Fatal("telegram.auth_status field not found")
+	}
+	if got := svc.GetValue(field); strings.Contains(got, "api_id") {
+		t.Fatalf("expected no credentials prompt with the environment set, got %q", got)
 	}
 }
 

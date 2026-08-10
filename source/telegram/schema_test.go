@@ -1,6 +1,9 @@
 package telegram
 
 import (
+	"os"
+	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/73ai/openbotkit/store"
@@ -62,6 +65,94 @@ func TestMigrateUniqueConstraint(t *testing.T) {
 	if err != nil {
 		t.Fatalf("same message_id in a different chat should succeed: %v", err)
 	}
+}
+
+// skillOnlyInternalTables are the tables the telegram-read skill deliberately
+// leaves out: gotd's pts/qts bookkeeping is plumbing, not something an agent
+// should be reading or joining against.
+var skillOnlyInternalTables = map[string]bool{"telegram_updates_state": true}
+
+// The schema lives twice: here and in skills/telegram-read/schema.sql, which is
+// what the agent reads before writing SQL. Nothing keeps them in step, so a
+// column added on one side quietly makes the other side's queries wrong.
+func TestSkillSchemaMatches(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "skills", "telegram-read", "schema.sql"))
+	if err != nil {
+		t.Fatalf("read skill schema: %v", err)
+	}
+
+	skillDB, err := store.Open(store.Config{Driver: "sqlite", DSN: ":memory:"})
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	t.Cleanup(func() { skillDB.Close() })
+	if _, err := skillDB.Exec(string(raw)); err != nil {
+		t.Fatalf("apply skill schema: %v", err)
+	}
+
+	want := tableColumns(t, testDB(t))
+	got := tableColumns(t, skillDB)
+
+	for table, columns := range want {
+		if skillOnlyInternalTables[table] {
+			if _, documented := got[table]; documented {
+				t.Fatalf("%s is internal; drop it from the skill schema or from the exemption list", table)
+			}
+			continue
+		}
+		skillColumns, ok := got[table]
+		if !ok {
+			t.Fatalf("skills/telegram-read/schema.sql is missing %s", table)
+		}
+		if !slices.Equal(columns, skillColumns) {
+			t.Fatalf("%s columns differ:\n  source: %v\n  skill:  %v", table, columns, skillColumns)
+		}
+	}
+
+	for table := range got {
+		if _, ok := want[table]; !ok {
+			t.Fatalf("skills/telegram-read/schema.sql documents %s, which the source schema does not create", table)
+		}
+	}
+}
+
+// tableColumns maps each telegram table to its column names, sorted.
+func tableColumns(t *testing.T, db *store.DB) map[string][]string {
+	t.Helper()
+
+	rows, err := db.Query(`SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'telegram_%'`)
+	if err != nil {
+		t.Fatalf("list tables: %v", err)
+	}
+	var tables []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			t.Fatalf("scan table: %v", err)
+		}
+		tables = append(tables, name)
+	}
+	rows.Close()
+
+	out := map[string][]string{}
+	for _, table := range tables {
+		cols, err := db.Query("SELECT name FROM pragma_table_info('" + table + "')")
+		if err != nil {
+			t.Fatalf("columns of %s: %v", table, err)
+		}
+		var names []string
+		for cols.Next() {
+			var name string
+			if err := cols.Scan(&name); err != nil {
+				t.Fatalf("scan column: %v", err)
+			}
+			names = append(names, name)
+		}
+		cols.Close()
+		slices.Sort(names)
+		out[table] = names
+	}
+	return out
 }
 
 func TestChatIDNormalisation(t *testing.T) {

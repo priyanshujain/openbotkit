@@ -158,12 +158,7 @@ func (s *StateStorage) ForEachChannels(ctx context.Context, userID int64, f func
 // rebuild an InputPeerChannel without a second lookup. userID is ignored: the
 // store holds exactly one account.
 func (s *StateStorage) SetChannelAccessHash(ctx context.Context, userID, channelID, accessHash int64) error {
-	return UpsertChat(s.db, &Chat{
-		ChatID:     ChatIDFromChannel(channelID),
-		Type:       PeerChannel,
-		AccessHash: accessHash,
-		IsChannel:  true,
-	})
+	return SetChatAccessHash(s.db, ChatIDFromChannel(channelID), accessHash)
 }
 
 func (s *StateStorage) GetChannelAccessHash(ctx context.Context, userID, channelID int64) (int64, bool, error) {
@@ -178,7 +173,7 @@ func (s *StateStorage) GetChannelAccessHash(ctx context.Context, userID, channel
 }
 
 func (s *StateStorage) SetUserAccessHash(ctx context.Context, userID, targetUserID, accessHash int64) error {
-	return UpsertUser(s.db, &User{UserID: targetUserID, AccessHash: accessHash})
+	return SetUserAccessHash(s.db, targetUserID, accessHash)
 }
 
 func (s *StateStorage) GetUserAccessHash(ctx context.Context, userID, targetUserID int64) (int64, bool, error) {

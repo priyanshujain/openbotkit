@@ -32,6 +32,19 @@ func SplitChatID(chatID int64) (kind string, rawID int64) {
 	}
 }
 
+// stubChat is everything a chat ID alone can say about a peer. A supergroup
+// looks like a plain channel here, which is why it must never overwrite a row
+// built from real entities.
+func stubChat(chatID int64) *Chat {
+	kind, _ := SplitChatID(chatID)
+	return &Chat{
+		ChatID:    chatID,
+		Type:      kind,
+		IsGroup:   kind == PeerGroup,
+		IsChannel: kind == PeerChannel,
+	}
+}
+
 type Message struct {
 	MessageID  int
 	ChatID     int64

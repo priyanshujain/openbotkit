@@ -82,6 +82,39 @@ func UpsertChat(db *store.DB, c *Chat) error {
 	return nil
 }
 
+// SetChatAccessHash records an access hash without touching identity columns.
+// The update manager calls this with nothing but an ID and a hash, so a full
+// upsert would reset is_group/is_channel on every supergroup it sees.
+func SetChatAccessHash(db *store.DB, chatID, accessHash int64) error {
+	stub := stubChat(chatID)
+	_, err := db.Exec(
+		db.Rebind(`INSERT INTO telegram_chats (chat_id, type, title, username, access_hash, is_group, is_channel)
+			VALUES (?, ?, '', '', ?, ?, ?)
+			ON CONFLICT(chat_id) DO UPDATE SET access_hash = excluded.access_hash`),
+		chatID, stub.Type, accessHash, stub.IsGroup, stub.IsChannel,
+	)
+	if err != nil {
+		return fmt.Errorf("set chat access hash: %w", err)
+	}
+	return nil
+}
+
+// TouchChatLastMessage records activity on a chat whose identity we cannot
+// resolve, leaving every other column alone.
+func TouchChatLastMessage(db *store.DB, chatID int64, at time.Time) error {
+	stub := stubChat(chatID)
+	_, err := db.Exec(
+		db.Rebind(`INSERT INTO telegram_chats (chat_id, type, title, username, is_group, is_channel, last_message_at)
+			VALUES (?, ?, '', '', ?, ?, ?)
+			ON CONFLICT(chat_id) DO UPDATE SET last_message_at = excluded.last_message_at`),
+		chatID, stub.Type, stub.IsGroup, stub.IsChannel, at.UTC(),
+	)
+	if err != nil {
+		return fmt.Errorf("touch chat: %w", err)
+	}
+	return nil
+}
+
 func GetChat(db *store.DB, chatID int64) (*Chat, error) {
 	var c Chat
 	var lastMsg sql.NullTime
@@ -176,6 +209,23 @@ func UpsertUser(db *store.DB, u *User) error {
 	)
 	if err != nil {
 		return fmt.Errorf("upsert user: %w", err)
+	}
+	return nil
+}
+
+// SetUserAccessHash records an access hash without touching identity columns,
+// so a refresh cannot flip is_bot or blank a name.
+func SetUserAccessHash(db *store.DB, userID, accessHash int64) error {
+	_, err := db.Exec(
+		db.Rebind(`INSERT INTO telegram_users (user_id, username, first_name, last_name, phone, access_hash, updated_at)
+			VALUES (?, '', '', '', '', ?, CURRENT_TIMESTAMP)
+			ON CONFLICT(user_id) DO UPDATE SET
+				access_hash = excluded.access_hash,
+				updated_at = CURRENT_TIMESTAMP`),
+		userID, accessHash,
+	)
+	if err != nil {
+		return fmt.Errorf("set user access hash: %w", err)
 	}
 	return nil
 }

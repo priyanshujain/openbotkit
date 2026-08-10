@@ -217,6 +217,117 @@ func TestUpsertChatPreservesKnownFields(t *testing.T) {
 	}
 }
 
+// The update manager refreshes access hashes with nothing but an ID, so the
+// refresh must not reset the flags that say what kind of chat this is.
+func TestSetChatAccessHashKeepsIdentity(t *testing.T) {
+	db := testDB(t)
+
+	last := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	supergroup := &Chat{
+		ChatID: ChatIDFromChannel(9), Type: PeerChannel, Title: "My Supergroup",
+		Username: "mysuper", AccessHash: 4242, IsGroup: true, IsChannel: true,
+		LastMessageAt: &last,
+	}
+	if err := UpsertChat(db, supergroup); err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+
+	if err := SetChatAccessHash(db, supergroup.ChatID, 5151); err != nil {
+		t.Fatalf("set access hash: %v", err)
+	}
+
+	got, err := GetChat(db, supergroup.ChatID)
+	if err != nil || got == nil {
+		t.Fatalf("get: %v", err)
+	}
+	if got.AccessHash != 5151 {
+		t.Fatalf("access_hash = %d, want 5151", got.AccessHash)
+	}
+	if !got.IsGroup || !got.IsChannel {
+		t.Fatalf("a supergroup must keep both flags after a hash refresh: %+v", got)
+	}
+	if got.Title != "My Supergroup" || got.Username != "mysuper" {
+		t.Fatalf("chat = %+v", got)
+	}
+	if got.LastMessageAt == nil {
+		t.Fatal("last_message_at cleared by a hash refresh")
+	}
+}
+
+// An unknown channel still needs a row, or the hash is lost and sending fails.
+func TestSetChatAccessHashCreatesMissingRow(t *testing.T) {
+	db := testDB(t)
+
+	chatID := ChatIDFromChannel(77)
+	if err := SetChatAccessHash(db, chatID, 999); err != nil {
+		t.Fatalf("set access hash: %v", err)
+	}
+
+	got, err := GetChat(db, chatID)
+	if err != nil || got == nil {
+		t.Fatalf("chat row missing: %v", err)
+	}
+	if got.AccessHash != 999 || got.Type != PeerChannel || !got.IsChannel {
+		t.Fatalf("chat = %+v", got)
+	}
+}
+
+func TestSetUserAccessHashKeepsIdentity(t *testing.T) {
+	db := testDB(t)
+
+	bot := &User{UserID: 7, Username: "somebot", FirstName: "Some Bot", AccessHash: 111, IsBot: true}
+	if err := UpsertUser(db, bot); err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+
+	if err := SetUserAccessHash(db, bot.UserID, 222); err != nil {
+		t.Fatalf("set access hash: %v", err)
+	}
+
+	got, err := GetUser(db, bot.UserID)
+	if err != nil || got == nil {
+		t.Fatalf("get: %v", err)
+	}
+	if got.AccessHash != 222 {
+		t.Fatalf("access_hash = %d, want 222", got.AccessHash)
+	}
+	if !got.IsBot {
+		t.Fatalf("is_bot reset by a hash refresh: %+v", got)
+	}
+	if got.Username != "somebot" || got.FirstName != "Some Bot" {
+		t.Fatalf("user = %+v", got)
+	}
+}
+
+func TestTouchChatLastMessageKeepsIdentity(t *testing.T) {
+	db := testDB(t)
+
+	last := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	chat := &Chat{
+		ChatID: ChatIDFromChannel(9), Type: PeerChannel, Title: "My Supergroup",
+		AccessHash: 4242, IsGroup: true, IsChannel: true, LastMessageAt: &last,
+	}
+	if err := UpsertChat(db, chat); err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+
+	newer := last.Add(time.Hour)
+	if err := TouchChatLastMessage(db, chat.ChatID, newer); err != nil {
+		t.Fatalf("touch: %v", err)
+	}
+
+	got, err := GetChat(db, chat.ChatID)
+	if err != nil || got == nil {
+		t.Fatalf("get: %v", err)
+	}
+	if !got.IsGroup || !got.IsChannel || got.Title != "My Supergroup" || got.AccessHash != 4242 {
+		t.Fatalf("chat = %+v", got)
+	}
+	if got.LastMessageAt == nil || !got.LastMessageAt.Equal(newer) {
+		t.Fatalf("last_message_at = %v, want %v", got.LastMessageAt, newer)
+	}
+}
+
 func TestGetChatMissing(t *testing.T) {
 	db := testDB(t)
 	got, err := GetChat(db, 12345)

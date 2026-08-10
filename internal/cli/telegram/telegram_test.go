@@ -160,6 +160,75 @@ func TestResolveChatIDAmbiguous(t *testing.T) {
 	}
 }
 
+// "@ann" is an explicit username. A group titled "Announcements" contains
+// "ann", and resolving to it would send the message to the wrong place with no
+// confirmation, since a single match sends immediately.
+func TestResolveChatIDUsernameNeverMatchesBySubstring(t *testing.T) {
+	db := sendTestDB(t)
+
+	now := time.Now().UTC()
+	for _, c := range []*tgsrc.Chat{
+		{ChatID: tgsrc.ChatIDFromUser(11), Type: tgsrc.PeerUser, Title: "Ann Lee", Username: "ann", LastMessageAt: &now},
+		{ChatID: tgsrc.ChatIDFromChannel(22), Type: tgsrc.PeerChannel, Title: "Announcements", IsChannel: true, LastMessageAt: &now},
+	} {
+		if err := tgsrc.UpsertChat(db, c); err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+	}
+
+	got, err := resolveChatID(db, "@ann")
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if got != tgsrc.ChatIDFromUser(11) {
+		t.Fatalf("@ann resolved to %d, want the user with that username", got)
+	}
+}
+
+// Without an exact username hit, a @name is an error rather than a guess.
+func TestResolveChatIDUnknownUsername(t *testing.T) {
+	db := sendTestDB(t)
+
+	now := time.Now().UTC()
+	if err := tgsrc.UpsertChat(db, &tgsrc.Chat{
+		ChatID: tgsrc.ChatIDFromChannel(22), Type: tgsrc.PeerChannel,
+		Title: "Announcements", IsChannel: true, LastMessageAt: &now,
+	}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	_, err := resolveChatID(db, "@ann")
+	if err == nil {
+		t.Fatal("expected an error rather than a substring match on the title")
+	}
+	if !strings.Contains(err.Error(), "no chat has the username") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+// An exact title beats a longer one that merely contains it.
+func TestResolveChatIDPrefersExactTitle(t *testing.T) {
+	db := sendTestDB(t)
+
+	now := time.Now().UTC()
+	for _, c := range []*tgsrc.Chat{
+		{ChatID: tgsrc.ChatIDFromUser(11), Type: tgsrc.PeerUser, Title: "Ann", LastMessageAt: &now},
+		{ChatID: tgsrc.ChatIDFromUser(12), Type: tgsrc.PeerUser, Title: "Ann Smith", LastMessageAt: &now},
+	} {
+		if err := tgsrc.UpsertChat(db, c); err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+	}
+
+	got, err := resolveChatID(db, "Ann")
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if got != tgsrc.ChatIDFromUser(11) {
+		t.Fatalf("resolved to %d, want the exactly titled chat", got)
+	}
+}
+
 func TestTruncate(t *testing.T) {
 	if got := truncate("short", 10); got != "short" {
 		t.Fatalf("got %q", got)

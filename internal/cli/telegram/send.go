@@ -70,32 +70,55 @@ var messagesSendCmd = &cobra.Command{
 	},
 }
 
-// resolveChatID accepts a numeric chat ID or a @username / title fragment.
-// Ambiguous names are reported rather than guessed.
+// resolveChatID accepts a numeric chat ID, a @username or a chat title.
+// An exact match always wins, and a substring is only ever a last resort for a
+// bare name: sending to the wrong person cannot be undone.
 func resolveChatID(db *store.DB, to string) (int64, error) {
 	if id, err := strconv.ParseInt(to, 10, 64); err == nil {
 		return id, nil
 	}
 
-	query := strings.TrimPrefix(to, "@")
-	chats, err := tgsrc.FindChats(db, query, 10)
+	// A leading @ names a username outright, so never fall back to a substring:
+	// "@ann" must not reach a group titled "Announcements".
+	if username, ok := strings.CutPrefix(to, "@"); ok {
+		chats, err := tgsrc.ChatsByUsername(db, username)
+		if err != nil {
+			return 0, fmt.Errorf("resolve %q: %w", to, err)
+		}
+		if len(chats) == 0 {
+			return 0, fmt.Errorf("no chat has the username %q — run 'obk telegram chats list' to see what is synced", to)
+		}
+		return pickChat(to, chats)
+	}
+
+	chats, err := tgsrc.ChatsByTitle(db, to)
 	if err != nil {
 		return 0, fmt.Errorf("resolve %q: %w", to, err)
 	}
-
-	switch len(chats) {
-	case 0:
-		return 0, fmt.Errorf("no chat matches %q — run 'obk telegram chats list' to see what is synced", to)
-	case 1:
-		return chats[0].ChatID, nil
-	default:
-		var b strings.Builder
-		fmt.Fprintf(&b, "%q matches %d chats, pass --to with one of these IDs:", to, len(chats))
-		for _, c := range chats {
-			fmt.Fprintf(&b, "\n  %d  %s", c.ChatID, c.Title)
+	if len(chats) == 0 {
+		if chats, err = tgsrc.FindChats(db, to, 10); err != nil {
+			return 0, fmt.Errorf("resolve %q: %w", to, err)
 		}
-		return 0, fmt.Errorf("%s", b.String())
 	}
+	if len(chats) == 0 {
+		return 0, fmt.Errorf("no chat matches %q — run 'obk telegram chats list' to see what is synced", to)
+	}
+	return pickChat(to, chats)
+}
+
+// pickChat takes the single match or reports every candidate. Ambiguity is
+// never resolved by guessing.
+func pickChat(to string, chats []tgsrc.Chat) (int64, error) {
+	if len(chats) == 1 {
+		return chats[0].ChatID, nil
+	}
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "%q matches %d chats, pass --to with one of these IDs:", to, len(chats))
+	for _, c := range chats {
+		fmt.Fprintf(&b, "\n  %d  %s", c.ChatID, c.Title)
+	}
+	return 0, fmt.Errorf("%s", b.String())
 }
 
 func init() {

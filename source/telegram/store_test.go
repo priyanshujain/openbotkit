@@ -185,6 +185,29 @@ func TestSearchEscapesLikeWildcards(t *testing.T) {
 		t.Fatalf("_ must be a literal, got %+v", got)
 	}
 }
+
+func TestFindChatsEscapesLikeWildcards(t *testing.T) {
+	db := testDB(t)
+
+	now := time.Now().UTC()
+	for _, c := range []*Chat{
+		{ChatID: 1, Type: PeerUser, Title: "100% Cotton", LastMessageAt: &now},
+		{ChatID: 2, Type: PeerUser, Title: "10000 Cotton", LastMessageAt: &now},
+	} {
+		if err := UpsertChat(db, c); err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+	}
+
+	got, err := FindChats(db, "100% Cotton", 10)
+	if err != nil {
+		t.Fatalf("find: %v", err)
+	}
+	if len(got) != 1 || got[0].ChatID != 1 {
+		t.Fatalf("expected only the literal match, got %+v", got)
+	}
+}
+
 func TestListUsersEscapesLikeWildcards(t *testing.T) {
 	db := testDB(t)
 

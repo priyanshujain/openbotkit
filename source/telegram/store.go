@@ -135,14 +135,9 @@ func GetChat(db *store.DB, chatID int64) (*Chat, error) {
 	return &c, nil
 }
 
-func ListChats(db *store.DB) ([]Chat, error) {
-	rows, err := db.Query(`SELECT chat_id, type, title, username, access_hash, is_group, is_channel, last_message_at
-		FROM telegram_chats ORDER BY last_message_at DESC`)
-	if err != nil {
-		return nil, fmt.Errorf("list chats: %w", err)
-	}
-	defer rows.Close()
+const chatColumns = `chat_id, type, title, username, access_hash, is_group, is_channel, last_message_at`
 
+func scanChats(rows *sql.Rows) ([]Chat, error) {
 	chats := []Chat{}
 	for rows.Next() {
 		var c Chat
@@ -159,16 +154,25 @@ func ListChats(db *store.DB) ([]Chat, error) {
 	return chats, rows.Err()
 }
 
-// FindChats matches chats by title or username, for resolving a send target.
+func ListChats(db *store.DB) ([]Chat, error) {
+	rows, err := db.Query("SELECT " + chatColumns + " FROM telegram_chats ORDER BY last_message_at DESC")
+	if err != nil {
+		return nil, fmt.Errorf("list chats: %w", err)
+	}
+	defer rows.Close()
+	return scanChats(rows)
+}
+
+// FindChats matches chats by a fragment of their title or username. It is a
+// search, not a send target: use ChatsByUsername or ChatsByTitle for that.
 func FindChats(db *store.DB, query string, limit int) ([]Chat, error) {
 	if limit <= 0 {
 		limit = 20
 	}
-	pattern := "%" + strings.ToLower(query) + "%"
+	pattern := likePattern(query)
 	rows, err := db.Query(
-		db.Rebind(`SELECT chat_id, type, title, username, access_hash, is_group, is_channel, last_message_at
-			FROM telegram_chats
-			WHERE LOWER(title) LIKE ? OR LOWER(username) LIKE ?
+		db.Rebind(`SELECT `+chatColumns+` FROM telegram_chats
+			WHERE LOWER(title) LIKE ? ESCAPE '\' OR LOWER(username) LIKE ? ESCAPE '\'
 			ORDER BY last_message_at DESC LIMIT ?`),
 		pattern, pattern, limit,
 	)
@@ -176,21 +180,39 @@ func FindChats(db *store.DB, query string, limit int) ([]Chat, error) {
 		return nil, fmt.Errorf("find chats: %w", err)
 	}
 	defer rows.Close()
+	return scanChats(rows)
+}
 
-	chats := []Chat{}
-	for rows.Next() {
-		var c Chat
-		var lastMsg sql.NullTime
-		if err := rows.Scan(&c.ChatID, &c.Type, &c.Title, &c.Username, &c.AccessHash,
-			&c.IsGroup, &c.IsChannel, &lastMsg); err != nil {
-			return nil, fmt.Errorf("scan chat: %w", err)
-		}
-		if lastMsg.Valid {
-			c.LastMessageAt = &lastMsg.Time
-		}
-		chats = append(chats, c)
+// ChatsByUsername returns chats whose username is exactly username, ignoring
+// case. Usernames are unique on Telegram, so this is at most one row.
+func ChatsByUsername(db *store.DB, username string) ([]Chat, error) {
+	rows, err := db.Query(
+		db.Rebind(`SELECT `+chatColumns+` FROM telegram_chats
+			WHERE username != '' AND LOWER(username) = ?
+			ORDER BY last_message_at DESC`),
+		strings.ToLower(username),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("find chats by username: %w", err)
 	}
-	return chats, rows.Err()
+	defer rows.Close()
+	return scanChats(rows)
+}
+
+// ChatsByTitle returns chats whose title is exactly title, ignoring case.
+// Titles are not unique, so callers still have to handle several matches.
+func ChatsByTitle(db *store.DB, title string) ([]Chat, error) {
+	rows, err := db.Query(
+		db.Rebind(`SELECT `+chatColumns+` FROM telegram_chats
+			WHERE title != '' AND LOWER(title) = ?
+			ORDER BY last_message_at DESC`),
+		strings.ToLower(title),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("find chats by title: %w", err)
+	}
+	defer rows.Close()
+	return scanChats(rows)
 }
 
 func UpsertUser(db *store.DB, u *User) error {

@@ -1186,6 +1186,29 @@ func TestTelegramAPIHashValidation(t *testing.T) {
 	}
 }
 
+// The account row and the credential rows must answer the same question. They
+// disagreed once: the account row asked the source package, which reads the
+// environment, while the credential rows read a config ref that a headless
+// install never writes.
+func TestTelegramCredentialRowsAgreeWithEnv(t *testing.T) {
+	t.Setenv("OBK_CONFIG_DIR", t.TempDir())
+	keyring.MockInit()
+	t.Setenv("TELEGRAM_API_ID", "1234567")
+	t.Setenv("TELEGRAM_API_HASH", "0123456789abcdef0123456789abcdef")
+
+	cfg := config.Default()
+	svc := testService(cfg)
+	for _, key := range []string{"telegram.api_id", "telegram.api_hash"} {
+		field := findField(svc, key)
+		if field == nil {
+			t.Fatalf("%s field not found", key)
+		}
+		if got := svc.GetValue(field); strings.Contains(got, "not configured") {
+			t.Fatalf("%s = %q while the account row reports configured", key, got)
+		}
+	}
+}
+
 // A headless install configures Telegram through the environment, which no
 // config ref records. Calling that unconfigured blocks login on a setup that
 // works.

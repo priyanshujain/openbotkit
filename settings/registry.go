@@ -2,6 +2,7 @@ package settings
 
 import (
 	"fmt"
+	"os"
 	"regexp"
 	"sort"
 	"strconv"
@@ -285,6 +286,22 @@ func ProfilePreview(name string) string {
 	fmt.Fprintf(&b, "  Nano:    %s\n\n", p.Tiers.Nano)
 	fmt.Fprintf(&b, "  Providers: %s", strings.Join(p.Providers, ", "))
 	return b.String()
+}
+
+// maskTelegramCredential reports on the credential the source package would
+// actually resolve: the keyring first, then the environment. Reading the config
+// ref instead would say "not configured" on a working headless install, while
+// the account row right above it says the opposite.
+func maskTelegramCredential(svc *Service, ref, envVar string) string {
+	if svc.loadCred != nil {
+		if key, err := svc.loadCred(ref); err == nil && key != "" {
+			return MaskKey(key)
+		}
+	}
+	if key := os.Getenv(envVar); key != "" {
+		return MaskKey(key)
+	}
+	return "not configured"
 }
 
 // maskCredential loads a credential and returns a masked version like "sk-ant...4x2f".
@@ -745,10 +762,7 @@ func telegramSourceCategory(svc *Service) *Category {
 				Description: "my.telegram.org -> API development tools",
 				Type:        TypePassword,
 				Get: func(c *config.Config) string {
-					if c.Telegram == nil || c.Telegram.APIIDRef == "" {
-						return "not configured"
-					}
-					return maskCredential(svc, c.Telegram.APIIDRef)
+					return maskTelegramCredential(svc, telegramsrc.APIIDRef, telegramsrc.EnvAPIID)
 				},
 				Set: func(c *config.Config, v string) error {
 					if v == "" {
@@ -777,10 +791,7 @@ func telegramSourceCategory(svc *Service) *Category {
 				Description: "Shown next to the api_id on my.telegram.org",
 				Type:        TypePassword,
 				Get: func(c *config.Config) string {
-					if c.Telegram == nil || c.Telegram.APIHashRef == "" {
-						return "not configured"
-					}
-					return maskCredential(svc, c.Telegram.APIHashRef)
+					return maskTelegramCredential(svc, telegramsrc.APIHashRef, telegramsrc.EnvAPIHash)
 				},
 				Set: func(c *config.Config, v string) error {
 					if v == "" {

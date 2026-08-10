@@ -24,8 +24,10 @@ const (
 	APIIDRef   = "keychain:obk/telegram/api_id"
 	APIHashRef = "keychain:obk/telegram/api_hash"
 
-	envAPIID   = "TELEGRAM_API_ID"
-	envAPIHash = "TELEGRAM_API_HASH"
+	// EnvAPIID and EnvAPIHash are the headless fallback, so anything that
+	// reports on credentials has to look here too, not just at the keyring.
+	EnvAPIID   = "TELEGRAM_API_ID"
+	EnvAPIHash = "TELEGRAM_API_HASH"
 )
 
 // Credentials resolves the app's api_id/api_hash from the keyring, falling back
@@ -33,13 +35,13 @@ const (
 // my.telegram.org: a shipped pair would collect API_ID_PUBLISHED_FLOOD for
 // everyone and a single revocation would break every install.
 func Credentials() (int, string, error) {
-	rawID, err := provider.ResolveAPIKey(APIIDRef, envAPIID)
+	rawID, err := provider.ResolveAPIKey(APIIDRef, EnvAPIID)
 	if err != nil {
-		return 0, "", fmt.Errorf("telegram api_id not configured — run 'obk setup telegram' (or set %s/%s)", envAPIID, envAPIHash)
+		return 0, "", fmt.Errorf("telegram api_id not configured — run 'obk setup telegram' (or set %s/%s)", EnvAPIID, EnvAPIHash)
 	}
-	hash, err := provider.ResolveAPIKey(APIHashRef, envAPIHash)
+	hash, err := provider.ResolveAPIKey(APIHashRef, EnvAPIHash)
 	if err != nil {
-		return 0, "", fmt.Errorf("telegram api_hash not configured — run 'obk setup telegram' (or set %s/%s)", envAPIID, envAPIHash)
+		return 0, "", fmt.Errorf("telegram api_hash not configured — run 'obk setup telegram' (or set %s/%s)", EnvAPIID, EnvAPIHash)
 	}
 	id, err := parseAPIID(rawID)
 	if err != nil {

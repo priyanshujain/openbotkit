@@ -203,8 +203,8 @@ var chatsListCmd = &cobra.Command{
 
 func init() {
 	messagesListCmd.Flags().String("chat", "", "Filter by chat JID")
-	messagesListCmd.Flags().String("after", "", "Messages after date (YYYY-MM-DD)")
-	messagesListCmd.Flags().String("before", "", "Messages before date (YYYY-MM-DD)")
+	messagesListCmd.Flags().String("after", "", "Messages on or after this date (YYYY-MM-DD)")
+	messagesListCmd.Flags().String("before", "", "Messages on or before this date (YYYY-MM-DD)")
 	messagesListCmd.Flags().Int("limit", 50, "Maximum number of results")
 	messagesListCmd.Flags().Bool("json", false, "Output as JSON")
 

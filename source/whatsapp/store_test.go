@@ -224,6 +224,43 @@ func TestListMessagesWithFilters(t *testing.T) {
 	}
 }
 
+// --before names a day, so the whole day counts. Comparing the raw flag string
+// against a stored timestamp drops everything after midnight.
+func TestListMessagesBeforeIncludesTheWholeDay(t *testing.T) {
+	db := testDB(t)
+	if err := Migrate(db); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	msg := &Message{
+		MessageID: "m1", ChatJID: "chat-a", Text: "noon",
+		Timestamp: time.Date(2026, 2, 1, 12, 0, 0, 0, time.UTC),
+	}
+	if err := SaveMessage(db, msg); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	results, err := ListMessages(db, ListOptions{Before: "2026-02-01", Limit: 10})
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected the midday message within --before 2026-02-01, got %d", len(results))
+	}
+
+	results, err = ListMessages(db, ListOptions{Before: "2026-01-31", Limit: 10})
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(results) != 0 {
+		t.Fatalf("--before must stay exclusive of later days, got %d", len(results))
+	}
+
+	if _, err := ListMessages(db, ListOptions{After: "yesterday", Limit: 10}); err == nil {
+		t.Fatal("expected an error for an unparseable --after")
+	}
+}
+
 func TestSearchMessages(t *testing.T) {
 	db := testDB(t)
 	if err := Migrate(db); err != nil {

@@ -21,8 +21,17 @@ type fakeFetcher struct {
 	dialogsErr error
 	historyErr error
 
-	// offsets records the offsetID each chat was asked for.
-	offsets map[int64]int
+	// offsets records, in order, the offsetIDs each chat was asked for.
+	offsets map[int64][]int
+}
+
+// lastOffset is the offsetID of the most recent history request for a chat.
+func (f *fakeFetcher) lastOffset(chatID int64) int {
+	calls := f.offsets[chatID]
+	if len(calls) == 0 {
+		return -1
+	}
+	return calls[len(calls)-1]
 }
 
 func (f *fakeFetcher) Dialogs(ctx context.Context, fn func(context.Context, dialogs.Elem) error) error {
@@ -46,9 +55,9 @@ func (f *fakeFetcher) History(ctx context.Context, p tg.InputPeerClass, offsetID
 		return nil
 	}
 	if f.offsets == nil {
-		f.offsets = map[int64]int{}
+		f.offsets = map[int64][]int{}
 	}
-	f.offsets[chatID] = offsetID
+	f.offsets[chatID] = append(f.offsets[chatID], offsetID)
 
 	for _, m := range f.history[chatID] {
 		msg := m.Msg.(*tg.Message)
@@ -251,8 +260,8 @@ func TestBackfillResumesFromStoredProgress(t *testing.T) {
 	if _, err := Backfill(ctx, f, db, BackfillOptions{PerChatLimit: 4}); err != nil {
 		t.Fatalf("first pass: %v", err)
 	}
-	if f.offsets[chatID] != 0 {
-		t.Fatalf("first pass should start from the newest message, got offset %d", f.offsets[chatID])
+	if f.lastOffset(chatID) != 0 {
+		t.Fatalf("first pass should start from the newest message, got offset %d", f.lastOffset(chatID))
 	}
 
 	state, err := GetSyncState(db, chatID)
@@ -267,8 +276,10 @@ func TestBackfillResumesFromStoredProgress(t *testing.T) {
 	if err != nil {
 		t.Fatalf("second pass: %v", err)
 	}
-	if f.offsets[chatID] != 7 {
-		t.Fatalf("second pass should resume at offset 7, got %d", f.offsets[chatID])
+	// The dialog's last message is already stored, so the catch-up pass is
+	// skipped and the only request resumes the older history.
+	if got := f.offsets[chatID]; len(got) != 2 || got[1] != 7 {
+		t.Fatalf("second pass should make one request at offset 7, got %v", got)
 	}
 	if res.Messages != 6 {
 		t.Fatalf("expected the remaining 6 messages, got %d", res.Messages)
@@ -303,8 +314,143 @@ func TestBackfillFullIgnoresProgress(t *testing.T) {
 	if _, err := Backfill(ctx, f, db, BackfillOptions{Full: true}); err != nil {
 		t.Fatalf("full pass: %v", err)
 	}
-	if f.offsets[chatID] != 0 {
-		t.Fatalf("full backfill should ignore stored progress, got offset %d", f.offsets[chatID])
+	if f.lastOffset(chatID) != 0 {
+		t.Fatalf("full backfill should ignore stored progress, got offset %d", f.lastOffset(chatID))
+	}
+}
+
+// getHistory only walks backwards, so a second run must sweep down from the
+// newest message first. Without that, anything that arrived since the last run
+// is unreachable and sync quietly stores nothing.
+func TestBackfillCatchesUpOnNewMessages(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+
+	now := time.Now().UTC().Truncate(time.Second)
+	ann := &tg.User{ID: 11, FirstName: "Ann"}
+	chatID := ChatIDFromUser(11)
+
+	older := []*tg.Message{
+		tgMessage(3, now.Add(-3*time.Minute), "c"),
+		tgMessage(2, now.Add(-4*time.Minute), "b"),
+		tgMessage(1, now.Add(-5*time.Minute), "a"),
+	}
+	d, hist := userDialog(ann, older...)
+	f := &fakeFetcher{
+		dialogs: []dialogs.Elem{d},
+		history: map[int64][]messages.Elem{chatID: hist},
+	}
+
+	if _, err := Backfill(ctx, f, db, BackfillOptions{}); err != nil {
+		t.Fatalf("first pass: %v", err)
+	}
+
+	// Two messages arrive after the first run.
+	newer := append([]*tg.Message{
+		tgMessage(5, now.Add(-time.Minute), "e"),
+		tgMessage(4, now.Add(-2*time.Minute), "d"),
+	}, older...)
+	d2, hist2 := userDialog(ann, newer...)
+	f.dialogs = []dialogs.Elem{d2}
+	f.history = map[int64][]messages.Elem{chatID: hist2}
+
+	res, err := Backfill(ctx, f, db, BackfillOptions{})
+	if err != nil {
+		t.Fatalf("second pass: %v", err)
+	}
+	if res.Messages != 2 {
+		t.Fatalf("expected the 2 new messages, got %d", res.Messages)
+	}
+
+	total, _ := CountMessages(db, chatID)
+	if total != 5 {
+		t.Fatalf("stored %d messages, want 5", total)
+	}
+
+	// Newest-first sweep, then the older-history resume.
+	if got := f.offsets[chatID]; len(got) != 3 || got[1] != 0 || got[2] != 1 {
+		t.Fatalf("expected a catch-up at offset 0 then a resume at 1, got %v", got)
+	}
+
+	state, err := GetSyncState(db, chatID)
+	if err != nil || state == nil {
+		t.Fatalf("sync state missing: %v", err)
+	}
+	if state.MaxID != 5 || state.MinID != 1 {
+		t.Fatalf("state = %+v, want min 1 max 5", state)
+	}
+}
+
+// A chat with nothing new must not cost an extra request per run.
+func TestBackfillSkipsCatchUpForQuietChats(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+
+	now := time.Now().UTC().Truncate(time.Second)
+	ann := &tg.User{ID: 11, FirstName: "Ann"}
+	chatID := ChatIDFromUser(11)
+	d, hist := userDialog(ann,
+		tgMessage(2, now, "b"),
+		tgMessage(1, now.Add(-time.Minute), "a"),
+	)
+	f := &fakeFetcher{
+		dialogs: []dialogs.Elem{d},
+		history: map[int64][]messages.Elem{chatID: hist},
+	}
+
+	if _, err := Backfill(ctx, f, db, BackfillOptions{}); err != nil {
+		t.Fatalf("first pass: %v", err)
+	}
+	before := len(f.offsets[chatID])
+
+	res, err := Backfill(ctx, f, db, BackfillOptions{})
+	if err != nil {
+		t.Fatalf("second pass: %v", err)
+	}
+	if res.Messages != 0 {
+		t.Fatalf("nothing new to store, got %d", res.Messages)
+	}
+	if got := len(f.offsets[chatID]) - before; got != 1 {
+		t.Fatalf("a quiet chat should cost one request, made %d", got)
+	}
+}
+
+// The limit caps the run, not each pass.
+func TestBackfillPerChatLimitCoversBothPasses(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+
+	now := time.Now().UTC().Truncate(time.Second)
+	ann := &tg.User{ID: 11, FirstName: "Ann"}
+	chatID := ChatIDFromUser(11)
+
+	d, hist := userDialog(ann,
+		tgMessage(2, now.Add(-time.Minute), "b"),
+		tgMessage(1, now.Add(-2*time.Minute), "a"),
+	)
+	f := &fakeFetcher{
+		dialogs: []dialogs.Elem{d},
+		history: map[int64][]messages.Elem{chatID: hist},
+	}
+	if _, err := Backfill(ctx, f, db, BackfillOptions{PerChatLimit: 1}); err != nil {
+		t.Fatalf("first pass: %v", err)
+	}
+
+	d2, hist2 := userDialog(ann,
+		tgMessage(4, now.Add(time.Minute), "d"),
+		tgMessage(3, now, "c"),
+		tgMessage(2, now.Add(-time.Minute), "b"),
+		tgMessage(1, now.Add(-2*time.Minute), "a"),
+	)
+	f.dialogs = []dialogs.Elem{d2}
+	f.history = map[int64][]messages.Elem{chatID: hist2}
+
+	res, err := Backfill(ctx, f, db, BackfillOptions{PerChatLimit: 1})
+	if err != nil {
+		t.Fatalf("second pass: %v", err)
+	}
+	if res.Messages != 1 {
+		t.Fatalf("the catch-up pass should consume the limit, got %d", res.Messages)
 	}
 }
 

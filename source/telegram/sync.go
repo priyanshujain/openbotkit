@@ -84,11 +84,7 @@ func Backfill(ctx context.Context, f Fetcher, db *store.DB, opts BackfillOptions
 		slog.Warn("telegram: could not read the stored account", "error", err)
 	}
 
-	type target struct {
-		peer tg.InputPeerClass
-		chat *Chat
-	}
-	var targets []target
+	var targets []backfillTarget
 
 	err = f.Dialogs(ctx, func(ctx context.Context, elem dialogs.Elem) error {
 		if err := saveEntities(db, elem.Entities); err != nil {
@@ -102,7 +98,11 @@ func Backfill(ctx context.Context, f Fetcher, db *store.DB, opts BackfillOptions
 			return err
 		}
 		result.Chats++
-		targets = append(targets, target{peer: elem.Peer, chat: chat})
+		t := backfillTarget{peer: elem.Peer, chat: chat}
+		if elem.Last != nil {
+			t.lastID = elem.Last.GetID()
+		}
+		targets = append(targets, t)
 		return nil
 	})
 	if err != nil {
@@ -110,7 +110,7 @@ func Backfill(ctx context.Context, f Fetcher, db *store.DB, opts BackfillOptions
 	}
 
 	for _, t := range targets {
-		n, err := backfillChat(ctx, f, db, t.peer, t.chat, selfID, opts)
+		n, err := backfillChat(ctx, f, db, t, selfID, opts)
 		result.Messages += n
 		if err != nil {
 			slog.Error("telegram: backfill chat", "chat_id", t.chat.ChatID, "error", err)
@@ -121,54 +121,88 @@ func Backfill(ctx context.Context, f Fetcher, db *store.DB, opts BackfillOptions
 	return result, nil
 }
 
-func backfillChat(ctx context.Context, f Fetcher, db *store.DB, peer tg.InputPeerClass, chat *Chat, selfID int64, opts BackfillOptions) (int, error) {
-	state, err := GetSyncState(db, chat.ChatID)
+type backfillTarget struct {
+	peer tg.InputPeerClass
+	chat *Chat
+	// lastID is the chat's newest message as the dialog listing reports it,
+	// which tells backfill whether a catch-up pass is worth an RPC.
+	lastID int
+}
+
+// backfillChat walks a chat's history in two passes: newest-first down to the
+// watermark a previous run left, then older history from where that run
+// stopped. getHistory only walks backwards, so without the catch-up pass
+// anything newer than the watermark would never be reachable again.
+func backfillChat(ctx context.Context, f Fetcher, db *store.DB, t backfillTarget, selfID int64, opts BackfillOptions) (int, error) {
+	state, err := GetSyncState(db, t.chat.ChatID)
 	if err != nil {
 		return 0, fmt.Errorf("get sync state: %w", err)
 	}
 	if state == nil || opts.Full {
-		state = &SyncState{ChatID: chat.ChatID}
+		state = &SyncState{ChatID: t.chat.ChatID}
 	}
-
-	// getHistory walks backwards from offsetID, so resuming means continuing
-	// from the oldest message stored so far.
-	offsetID := state.MinID
 
 	saved := 0
 	var oldest time.Time
 
-	iterErr := f.History(ctx, peer, offsetID, func(ctx context.Context, elem messages.Elem) error {
-		if err := saveEntities(db, elem.Entities); err != nil {
-			return err
-		}
+	// walk stores messages from offsetID backwards. stopAt ends the catch-up
+	// pass at the watermark; trackFloor records how far back history now
+	// reaches, which only the older-history pass extends.
+	walk := func(offsetID, stopAt int, trackFloor bool) error {
+		err := f.History(ctx, t.peer, offsetID, func(ctx context.Context, elem messages.Elem) error {
+			if err := saveEntities(db, elem.Entities); err != nil {
+				return err
+			}
 
-		msg, ok := messageFromTG(elem.Msg, chat.ChatID, selfID)
-		if !ok {
+			msg, ok := messageFromTG(elem.Msg, t.chat.ChatID, selfID)
+			if !ok {
+				return nil
+			}
+			if stopAt > 0 && msg.MessageID <= stopAt {
+				return errStopChat
+			}
+			if !opts.Since.IsZero() && msg.Timestamp.Before(opts.Since) {
+				return errStopChat
+			}
+			msg.SenderName = resolveSenderName(db, msg.SenderID)
+
+			if err := SaveMessage(db, msg); err != nil {
+				return fmt.Errorf("save message %d: %w", msg.MessageID, err)
+			}
+			saved++
+			if trackFloor {
+				oldest = msg.Timestamp
+			}
+
+			if state.MinID == 0 || msg.MessageID < state.MinID {
+				state.MinID = msg.MessageID
+			}
+			if msg.MessageID > state.MaxID {
+				state.MaxID = msg.MessageID
+			}
+
+			if opts.PerChatLimit > 0 && saved >= opts.PerChatLimit {
+				return errStopChat
+			}
 			return nil
-		}
-		if !opts.Since.IsZero() && msg.Timestamp.Before(opts.Since) {
-			return errStopChat
-		}
-		msg.SenderName = resolveSenderName(db, msg.SenderID)
-
-		if err := SaveMessage(db, msg); err != nil {
-			return fmt.Errorf("save message %d: %w", msg.MessageID, err)
-		}
-		saved++
-		oldest = msg.Timestamp
-
-		if state.MinID == 0 || msg.MessageID < state.MinID {
-			state.MinID = msg.MessageID
-		}
-		if msg.MessageID > state.MaxID {
-			state.MaxID = msg.MessageID
-		}
-
-		if opts.PerChatLimit > 0 && saved >= opts.PerChatLimit {
-			return errStopChat
+		})
+		if err != nil && !errors.Is(err, errStopChat) {
+			return fmt.Errorf("iterate history: %w", err)
 		}
 		return nil
-	})
+	}
+
+	resumeFrom, watermark := state.MinID, state.MaxID
+
+	var iterErr error
+	// The dialog listing already told us the newest message, so a chat with
+	// nothing new costs no extra request.
+	if watermark > 0 && t.lastID > watermark {
+		iterErr = walk(0, watermark, false)
+	}
+	if iterErr == nil && (opts.PerChatLimit <= 0 || saved < opts.PerChatLimit) {
+		iterErr = walk(resumeFrom, 0, true)
+	}
 
 	if saved > 0 {
 		if !oldest.IsZero() {
@@ -178,9 +212,5 @@ func backfillChat(ctx context.Context, f Fetcher, db *store.DB, peer tg.InputPee
 			return saved, fmt.Errorf("save sync state: %w", err)
 		}
 	}
-
-	if iterErr != nil && !errors.Is(iterErr, errStopChat) {
-		return saved, fmt.Errorf("iterate history: %w", iterErr)
-	}
-	return saved, nil
+	return saved, iterErr
 }

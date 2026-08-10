@@ -95,7 +95,9 @@ func chatFromDialog(elem dialogs.Elem) (*Chat, bool) {
 	if !ok {
 		return nil, false
 	}
-	chat := chatFromEntities(chatID, elem.Entities)
+	// A dialog response always carries its own peer, so the stub is theoretical
+	// here and backfill needs a chat either way.
+	chat, _ := chatFromEntities(chatID, elem.Entities)
 	if elem.Last != nil {
 		ts := time.Unix(int64(elem.Last.GetDate()), 0).UTC()
 		chat.LastMessageAt = &ts
@@ -103,30 +105,26 @@ func chatFromDialog(elem dialogs.Elem) (*Chat, bool) {
 	return chat, true
 }
 
-// chatFromEntities builds the richest chat row the entity set allows, falling
-// back to a bare row when the peer is not present.
-func chatFromEntities(chatID int64, ents peer.Entities) *Chat {
+// chatFromEntities builds the richest chat row the entity set allows. It
+// reports false when the peer is absent and the result is only a stub, so
+// callers do not write guessed identity over what is already stored.
+func chatFromEntities(chatID int64, ents peer.Entities) (*Chat, bool) {
 	kind, rawID := SplitChatID(chatID)
 	switch kind {
 	case PeerUser:
 		if u, ok := ents.User(rawID); ok && u != nil {
-			return chatFromTGUser(u)
+			return chatFromTGUser(u), true
 		}
 	case PeerGroup:
 		if c, ok := ents.Chat(rawID); ok && c != nil {
-			return chatFromTGChat(c)
+			return chatFromTGChat(c), true
 		}
 	case PeerChannel:
 		if c, ok := ents.Channel(rawID); ok && c != nil {
-			return chatFromTGChannel(c)
+			return chatFromTGChannel(c), true
 		}
 	}
-	return &Chat{
-		ChatID:    chatID,
-		Type:      kind,
-		IsGroup:   kind == PeerGroup,
-		IsChannel: kind == PeerChannel,
-	}
+	return stubChat(chatID), false
 }
 
 func chatIDFromInputPeer(p tg.InputPeerClass) (int64, bool) {

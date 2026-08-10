@@ -129,10 +129,13 @@ func storeUpdateMessage(db *store.DB, selfID int64, e tg.Entities, raw tg.Messag
 		return false
 	}
 
-	chat := chatFromEntities(chatID, ents)
-	chat.LastMessageAt = &msg.Timestamp
-	if err := UpsertChat(db, chat); err != nil {
-		slog.Error("telegram: upsert chat", "chat_id", chatID, "error", err)
+	if chat, resolved := chatFromEntities(chatID, ents); resolved {
+		chat.LastMessageAt = &msg.Timestamp
+		if err := UpsertChat(db, chat); err != nil {
+			slog.Error("telegram: upsert chat", "chat_id", chatID, "error", err)
+		}
+	} else if err := TouchChatLastMessage(db, chatID, msg.Timestamp); err != nil {
+		slog.Error("telegram: touch chat", "chat_id", chatID, "error", err)
 	}
 	return true
 }

@@ -87,6 +87,51 @@ func TestLiveChannelMessageIsStored(t *testing.T) {
 	}
 }
 
+// Updates for a peer the client already knows carry no entity for it. Such an
+// update must record activity without asserting an identity it does not have.
+func TestLiveUpdateWithoutEntitiesKeepsChatFlags(t *testing.T) {
+	db := testDB(t)
+	d := tg.NewUpdateDispatcher()
+	registerUpdateHandlers(d, db, 0, nil)
+
+	chatID := ChatIDFromChannel(41)
+	seeded := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	if err := UpsertChat(db, &Chat{
+		ChatID: chatID, Type: PeerChannel, Title: "My Supergroup", Username: "mysuper",
+		AccessHash: 4141, IsGroup: true, IsChannel: true, LastMessageAt: &seeded,
+	}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	now := seeded.Add(time.Hour)
+	msg := &tg.Message{ID: 9, Date: int(now.Unix()), Message: "shipped"}
+	msg.PeerID = &tg.PeerChannel{ChannelID: 41}
+
+	if err := d.Handle(context.Background(), &tg.Updates{
+		Updates: []tg.UpdateClass{&tg.UpdateNewChannelMessage{Message: msg}},
+	}); err != nil {
+		t.Fatalf("handle: %v", err)
+	}
+
+	if n, _ := CountMessages(db, chatID); n != 1 {
+		t.Fatalf("stored %d messages, want 1", n)
+	}
+
+	chat, err := GetChat(db, chatID)
+	if err != nil || chat == nil {
+		t.Fatalf("chat missing: %v", err)
+	}
+	if !chat.IsGroup || !chat.IsChannel {
+		t.Fatalf("an entity-less update must not reset the flags: %+v", chat)
+	}
+	if chat.Title != "My Supergroup" || chat.Username != "mysuper" || chat.AccessHash != 4141 {
+		t.Fatalf("chat = %+v", chat)
+	}
+	if chat.LastMessageAt == nil || !chat.LastMessageAt.Equal(now) {
+		t.Fatalf("last_message_at = %v, want %v", chat.LastMessageAt, now)
+	}
+}
+
 // Telegram omits from_id on outgoing private messages. Leaving sender_id at 0
 // would give the same message a different sender depending on whether it was
 // sent from the phone or through obk, and break joins against telegram_users.

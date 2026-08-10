@@ -200,8 +200,9 @@ top-level `telegram` key. The setup wizard lists them as separate options.
 Departures from the sketch worth knowing about:
 
 - **Login is a browser QR code, not phone and code.** `obk telegram auth login` serves a page
-  on `:8086`, mirroring `obk whatsapp auth login`. Port `8085` was already taken by both the
-  WhatsApp QR server and the Google OAuth callback.
+  on `127.0.0.1:8086`, mirroring `obk whatsapp auth login`. Port `8085` was already taken by
+  both the WhatsApp QR server and the Google OAuth callback. It binds to loopback because
+  `/api/password` forwards cloud passwords to Telegram; `--addr` opts out for container use.
 - **2FA needed writing ourselves.** `qrlogin` returns `SESSION_PASSWORD_NEEDED` rather than
   handling the cloud password, so the auth page carries a real password state that collects it
   over `POST /api/password` and retries on a wrong password.

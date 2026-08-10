@@ -150,7 +150,7 @@ var authStatusCmd = &cobra.Command{
 }
 
 func init() {
-	authLoginCmd.Flags().String("addr", ":8086", "Address for the local QR login page")
+	authLoginCmd.Flags().String("addr", "127.0.0.1:8086", "Address for the local QR login page")
 	authLogoutCmd.Flags().Bool("force", false, "Skip confirmation prompt")
 	authStatusCmd.Flags().Bool("json", false, "Output as JSON")
 

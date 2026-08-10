@@ -266,7 +266,9 @@ func newAuthMux(st *authState) *http.ServeMux {
 // dialogs are recorded so chats are queryable straight after login.
 func ServeQR(ctx context.Context, client *Client, addr string, db *store.DB) error {
 	if addr == "" {
-		addr = ":8086"
+		// Loopback only: /api/password forwards cloud passwords to Telegram and
+		// /api/qr serves the password hint, neither of which belongs on the LAN.
+		addr = "127.0.0.1:8086"
 	}
 
 	st := newAuthState()

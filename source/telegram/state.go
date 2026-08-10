@@ -60,35 +60,38 @@ func (s *StateStorage) setInt(key string, value int) error {
 	return SetKV(s.db, key, strconv.Itoa(value))
 }
 
+// GetState reports a state only when all four fields are present. A partial
+// state is one an older, non-atomic write left behind; refetching from the
+// server beats resuming from half of a state.
 func (s *StateStorage) GetState(ctx context.Context, userID int64) (updates.State, bool, error) {
-	pts, found, err := s.getInt(stateKey(userID, "pts"))
-	if err != nil || !found {
-		return updates.State{}, found, err
+	var state updates.State
+	for _, field := range []struct {
+		name string
+		into *int
+	}{
+		{"pts", &state.Pts}, {"qts", &state.Qts}, {"date", &state.Date}, {"seq", &state.Seq},
+	} {
+		value, found, err := s.getInt(stateKey(userID, field.name))
+		if err != nil {
+			return updates.State{}, false, err
+		}
+		if !found {
+			return updates.State{}, false, nil
+		}
+		*field.into = value
 	}
-	qts, _, err := s.getInt(stateKey(userID, "qts"))
-	if err != nil {
-		return updates.State{}, false, err
-	}
-	date, _, err := s.getInt(stateKey(userID, "date"))
-	if err != nil {
-		return updates.State{}, false, err
-	}
-	seq, _, err := s.getInt(stateKey(userID, "seq"))
-	if err != nil {
-		return updates.State{}, false, err
-	}
-	return updates.State{Pts: pts, Qts: qts, Date: date, Seq: seq}, true, nil
+	return state, true, nil
 }
 
+// SetState writes the four fields in one statement: they are only meaningful
+// together, so a partial write must not be possible.
 func (s *StateStorage) SetState(ctx context.Context, userID int64, state updates.State) error {
-	for field, value := range map[string]int{
-		"pts": state.Pts, "qts": state.Qts, "date": state.Date, "seq": state.Seq,
-	} {
-		if err := s.setInt(stateKey(userID, field), value); err != nil {
-			return err
-		}
-	}
-	return nil
+	return SetKVBatch(s.db, map[string]string{
+		stateKey(userID, "pts"):  strconv.Itoa(state.Pts),
+		stateKey(userID, "qts"):  strconv.Itoa(state.Qts),
+		stateKey(userID, "date"): strconv.Itoa(state.Date),
+		stateKey(userID, "seq"):  strconv.Itoa(state.Seq),
+	})
 }
 
 // setField refuses to write when no state exists yet, as the interface requires.

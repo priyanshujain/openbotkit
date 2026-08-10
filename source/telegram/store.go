@@ -530,6 +530,34 @@ func SetKV(db *store.DB, key, value string) error {
 	return nil
 }
 
+// SetKVBatch writes several keys in one statement, which both SQLite and
+// Postgres apply atomically. The updates state is four keys that only mean
+// anything together: a crash between separate writes would leave a state that
+// reads back as valid with zeroed fields and silently breaks gap recovery.
+func SetKVBatch(db *store.DB, pairs map[string]string) error {
+	if len(pairs) == 0 {
+		return nil
+	}
+
+	rows := make([]string, 0, len(pairs))
+	args := make([]any, 0, len(pairs)*2)
+	for key, value := range pairs {
+		rows = append(rows, "(?, ?)")
+		args = append(args, key, value)
+	}
+
+	_, err := db.Exec(
+		db.Rebind("INSERT INTO telegram_updates_state (key, value) VALUES "+
+			strings.Join(rows, ", ")+
+			" ON CONFLICT(key) DO UPDATE SET value = excluded.value"),
+		args...,
+	)
+	if err != nil {
+		return fmt.Errorf("set %d keys: %w", len(pairs), err)
+	}
+	return nil
+}
+
 // ListKVPrefix returns all key/value pairs whose key starts with prefix.
 func ListKVPrefix(db *store.DB, prefix string) (map[string]string, error) {
 	rows, err := db.Query(

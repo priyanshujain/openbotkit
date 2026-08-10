@@ -30,6 +30,40 @@ func TestStateStorageRoundTrip(t *testing.T) {
 	}
 }
 
+// pts alone is not a state. A half-written one must not read back as valid, or
+// gap recovery resumes from zeroed qts/date/seq without saying anything.
+func TestStateStoragePartialStateIsNotFound(t *testing.T) {
+	db := testDB(t)
+	s := NewStateStorage(db)
+	ctx := context.Background()
+
+	if err := SetKV(db, stateKey(1, "pts"), "10"); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	if _, found, err := s.GetState(ctx, 1); err != nil || found {
+		t.Fatalf("a state missing qts/date/seq must report not found, found=%v err=%v", found, err)
+	}
+}
+
+// One statement, so a crash cannot land between the fields.
+func TestStateStorageSetStateIsOneStatement(t *testing.T) {
+	db := testDB(t)
+	s := NewStateStorage(db)
+
+	if err := s.SetState(context.Background(), 1, updates.State{Pts: 1, Qts: 2, Date: 3, Seq: 4}); err != nil {
+		t.Fatalf("set state: %v", err)
+	}
+
+	stored, err := ListKVPrefix(db, "state:1:")
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(stored) != 4 {
+		t.Fatalf("stored %d keys, want 4: %v", len(stored), stored)
+	}
+}
+
 func TestStateStorageFieldSetters(t *testing.T) {
 	db := testDB(t)
 	s := NewStateStorage(db)

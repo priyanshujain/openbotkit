@@ -103,9 +103,6 @@ type SyncState struct {
 
 type Config struct {
 	SessionPath string
-	DataDSN     string
-	APIID       int
-	APIHash     string
 }
 
 type BackfillOptions struct {

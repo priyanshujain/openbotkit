@@ -135,9 +135,6 @@ poll();
 </script>
 </body></html>`
 
-// AuthPage returns the HTML for the Telegram QR authentication page.
-func AuthPage() string { return authPage }
-
 // authState is the shared state between the auth goroutine and the HTTP
 // handlers. Every field is guarded by mu.
 type authState struct {

@@ -104,10 +104,18 @@ func parseSince(since string, defaultDays int) (time.Time, error) {
 		if err != nil {
 			return time.Time{}, fmt.Errorf("invalid --since %q", since)
 		}
+		// A negative window lands in the future, so every message is older than
+		// it and the backfill stops instantly reporting nothing.
+		if days < 0 {
+			return time.Time{}, fmt.Errorf("--since %q is in the future; drop the minus sign", since)
+		}
 		return time.Now().UTC().AddDate(0, 0, -days), nil
 	}
 
 	if d, err := time.ParseDuration(since); err == nil {
+		if d < 0 {
+			return time.Time{}, fmt.Errorf("--since %q is in the future; drop the minus sign", since)
+		}
 		return time.Now().UTC().Add(-d), nil
 	}
 

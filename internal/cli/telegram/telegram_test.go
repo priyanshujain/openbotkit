@@ -75,6 +75,16 @@ func TestParseSinceInvalid(t *testing.T) {
 	}
 }
 
+// A negative window is a future timestamp, which makes every message "too old"
+// and backfills nothing while reporting success.
+func TestParseSinceRejectsNegativeWindows(t *testing.T) {
+	for _, in := range []string{"-30d", "-12h"} {
+		if _, err := parseSince(in, 90); err == nil {
+			t.Fatalf("expected an error for %q", in)
+		}
+	}
+}
+
 func sendTestDB(t *testing.T) *store.DB {
 	t.Helper()
 	db, err := store.Open(store.Config{Driver: "sqlite", DSN: ":memory:"})

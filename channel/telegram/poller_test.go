@@ -87,7 +87,7 @@ func TestPoller_KillWhileAgentRunning(t *testing.T) {
 type racyInterrupter struct{ mockInterrupter }
 
 func (r *racyInterrupter) IsAgentRunning() bool { return true }
-func (r *racyInterrupter) Kill() bool            { return false }
+func (r *racyInterrupter) Kill() bool           { return false }
 
 func TestPoller_KillAgentFinishesBetweenCheckAndKill(t *testing.T) {
 	bot := &mockBot{}

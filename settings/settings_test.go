@@ -8,6 +8,7 @@ import (
 
 	"github.com/73ai/openbotkit/config"
 	"github.com/73ai/openbotkit/provider"
+	"github.com/zalando/go-keyring"
 )
 
 func testService(cfg *config.Config) *Service {
@@ -268,7 +269,6 @@ func TestProfileDisplaysLabel(t *testing.T) {
 		t.Errorf("profile display = %q, want to contain 'Gemini'", got)
 	}
 }
-
 
 func TestProfileNotConfiguredDisplay(t *testing.T) {
 	cfg := &config.Config{}
@@ -1089,6 +1089,174 @@ func findFieldInNodes(nodes []Node, key string) *Field {
 	return nil
 }
 
+func TestTelegramAuthStatusField(t *testing.T) {
+	// Isolated config dir, so the status does not depend on whether the
+	// machine running the tests happens to be linked.
+	t.Setenv("OBK_CONFIG_DIR", t.TempDir())
+	// The gate asks whether credentials resolve, so the keyring and the
+	// environment both have to be this test's own.
+	keyring.MockInit()
+	t.Setenv("TELEGRAM_API_ID", "")
+	t.Setenv("TELEGRAM_API_HASH", "")
+
+	cfg := config.Default()
+	svc := New(cfg,
+		WithSaveFn(func(*config.Config) error { return nil }),
+		WithStoreCred(provider.StoreCredential),
+		WithLoadCred(provider.LoadCredential),
+	)
+
+	field := findField(svc, "telegram.auth_status")
+	if field == nil {
+		t.Fatal("telegram.auth_status field not found")
+	}
+
+	// Always read-only: pressing Enter dispatches the login flow instead of
+	// editing the value.
+	if field.ReadOnly == nil || !field.ReadOnly(cfg) {
+		t.Fatal("telegram.auth_status must be permanently read-only")
+	}
+
+	// Signing in is pointless without app credentials, so it stays gated.
+	if got := svc.GetValue(field); !strings.Contains(got, "api_id") {
+		t.Fatalf("expected a credentials prompt before setup, got %q", got)
+	}
+
+	apiID := findField(svc, "telegram.api_id")
+	apiHash := findField(svc, "telegram.api_hash")
+	if apiID == nil || apiHash == nil {
+		t.Fatal("telegram credential fields not found")
+	}
+	if err := svc.SetValue(apiID, "1234567"); err != nil {
+		t.Fatalf("set api_id: %v", err)
+	}
+	if err := svc.SetValue(apiHash, "0123456789abcdef0123456789abcdef"); err != nil {
+		t.Fatalf("set api_hash: %v", err)
+	}
+
+	if !IsTelegramConfigured() {
+		t.Fatal("credentials should be recorded in config")
+	}
+	if got := svc.GetValue(field); !strings.Contains(got, "Not connected") {
+		t.Fatalf("expected a sign-in prompt once configured, got %q", got)
+	}
+
+	// Credentials live in the keyring, never in config.yaml.
+	if cfg.Telegram.APIIDRef != "keychain:obk/telegram/api_id" {
+		t.Fatalf("api_id ref = %q", cfg.Telegram.APIIDRef)
+	}
+	if cfg.Telegram.APIHashRef != "keychain:obk/telegram/api_hash" {
+		t.Fatalf("api_hash ref = %q", cfg.Telegram.APIHashRef)
+	}
+	if got := svc.GetValue(apiHash); strings.Contains(got, "0123456789abcdef0123456789abcdef") {
+		t.Fatalf("api_hash must be masked, got %q", got)
+	}
+}
+
+func TestTelegramAPIIDValidation(t *testing.T) {
+	cfg := config.Default()
+	svc := testService(cfg)
+
+	field := findField(svc, "telegram.api_id")
+	if field == nil {
+		t.Fatal("telegram.api_id field not found")
+	}
+	if err := svc.SetValue(field, "not-a-number"); err == nil {
+		t.Fatal("expected a non-numeric api_id to be rejected")
+	}
+}
+
+// A truncated paste should be caught here, not as an opaque MTProto error at
+// login.
+func TestTelegramAPIHashValidation(t *testing.T) {
+	cfg := config.Default()
+	svc := testService(cfg)
+
+	field := findField(svc, "telegram.api_hash")
+	if field == nil {
+		t.Fatal("telegram.api_hash field not found")
+	}
+	for _, bad := range []string{"0123456789abcdef", "0123456789abcdef0123456789abcdefff", "zzz3456789abcdef0123456789abcdef"} {
+		if err := svc.SetValue(field, bad); err == nil {
+			t.Fatalf("expected %q to be rejected", bad)
+		}
+	}
+	if err := svc.SetValue(field, "0123456789ABCDEF0123456789abcdef"); err != nil {
+		t.Fatalf("a valid api_hash was rejected: %v", err)
+	}
+}
+
+// The account row and the credential rows must answer the same question. They
+// disagreed once: the account row asked the source package, which reads the
+// environment, while the credential rows read a config ref that a headless
+// install never writes.
+func TestTelegramCredentialRowsAgreeWithEnv(t *testing.T) {
+	t.Setenv("OBK_CONFIG_DIR", t.TempDir())
+	keyring.MockInit()
+	t.Setenv("TELEGRAM_API_ID", "1234567")
+	t.Setenv("TELEGRAM_API_HASH", "0123456789abcdef0123456789abcdef")
+
+	cfg := config.Default()
+	svc := testService(cfg)
+	for _, key := range []string{"telegram.api_id", "telegram.api_hash"} {
+		field := findField(svc, key)
+		if field == nil {
+			t.Fatalf("%s field not found", key)
+		}
+		if got := svc.GetValue(field); strings.Contains(got, "not configured") {
+			t.Fatalf("%s = %q while the account row reports configured", key, got)
+		}
+	}
+}
+
+// A headless install configures Telegram through the environment, which no
+// config ref records. Calling that unconfigured blocks login on a setup that
+// works.
+func TestTelegramConfiguredFromEnvironment(t *testing.T) {
+	t.Setenv("OBK_CONFIG_DIR", t.TempDir())
+	keyring.MockInit()
+	t.Setenv("TELEGRAM_API_ID", "1234567")
+	t.Setenv("TELEGRAM_API_HASH", "0123456789abcdef0123456789abcdef")
+
+	cfg := config.Default()
+	if !IsTelegramConfigured() {
+		t.Fatal("credentials from the environment must count as configured")
+	}
+
+	svc := testService(cfg)
+	field := findField(svc, "telegram.auth_status")
+	if field == nil {
+		t.Fatal("telegram.auth_status field not found")
+	}
+	if got := svc.GetValue(field); strings.Contains(got, "api_id") {
+		t.Fatalf("expected no credentials prompt with the environment set, got %q", got)
+	}
+}
+
+func TestTelegramBackfillDaysField(t *testing.T) {
+	cfg := config.Default()
+	svc := testService(cfg)
+
+	field := findField(svc, "telegram.backfill_days")
+	if field == nil {
+		t.Fatal("telegram.backfill_days field not found")
+	}
+	if got := svc.GetValue(field); got != "90" {
+		t.Fatalf("default backfill window = %q, want 90", got)
+	}
+
+	if err := svc.SetValue(field, "30"); err != nil {
+		t.Fatalf("set: %v", err)
+	}
+	if cfg.Telegram.BackfillDays != 30 {
+		t.Fatalf("backfill days = %d", cfg.Telegram.BackfillDays)
+	}
+
+	if err := svc.SetValue(field, "0"); err == nil {
+		t.Fatal("expected a zero backfill window to be rejected")
+	}
+}
+
 func TestXAuthStatusField(t *testing.T) {
 	cfg := config.Default()
 	svc := testService(cfg)
@@ -1103,4 +1271,3 @@ func TestXAuthStatusField(t *testing.T) {
 		t.Errorf("unexpected auth status: %q", got)
 	}
 }
-

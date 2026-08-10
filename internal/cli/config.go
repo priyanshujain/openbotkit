@@ -16,8 +16,8 @@ var configCmd = &cobra.Command{
 }
 
 var configInitCmd = &cobra.Command{
-	Use:   "init",
-	Short: "Create default configuration file",
+	Use:     "init",
+	Short:   "Create default configuration file",
 	Example: `  obk config init`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		path := config.FilePath()
@@ -39,8 +39,8 @@ var configInitCmd = &cobra.Command{
 }
 
 var configShowCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List all configuration properties",
+	Use:     "list",
+	Short:   "List all configuration properties",
 	Example: `  obk config list`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load()
@@ -63,7 +63,7 @@ var configSetCmd = &cobra.Command{
 	Short: "Set a configuration value",
 	Example: `  obk config set timezone America/New_York
   obk config set gmail.storage.driver postgres`,
-	Args:  cobra.ExactArgs(2),
+	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load()
 		if err != nil {
@@ -94,8 +94,8 @@ var configSetCmd = &cobra.Command{
 }
 
 var configPathCmd = &cobra.Command{
-	Use:   "path",
-	Short: "Print the configuration directory path",
+	Use:     "path",
+	Short:   "Print the configuration directory path",
 	Example: `  obk config path`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(config.Dir())

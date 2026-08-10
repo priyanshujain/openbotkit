@@ -30,9 +30,9 @@ func (s *LLMSummarizer) Summarize(ctx context.Context, messages []provider.Messa
 	}
 
 	resp, err := s.Provider.Chat(ctx, provider.ChatRequest{
-		Model:    s.Model,
-		System:   summarizePrompt,
-		Messages: []provider.Message{provider.NewTextMessage(provider.RoleUser, b.String())},
+		Model:     s.Model,
+		System:    summarizePrompt,
+		Messages:  []provider.Message{provider.NewTextMessage(provider.RoleUser, b.String())},
 		MaxTokens: 1024,
 	})
 	if err != nil {

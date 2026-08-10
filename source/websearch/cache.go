@@ -228,4 +228,3 @@ func clearAllCaches(db *store.DB) error {
 	}
 	return nil
 }
-

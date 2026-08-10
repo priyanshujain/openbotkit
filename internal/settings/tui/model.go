@@ -7,21 +7,21 @@ import (
 	"strings"
 	"time"
 
+	"github.com/73ai/openbotkit/config"
+	"github.com/73ai/openbotkit/provider"
+	"github.com/73ai/openbotkit/settings"
+	xclient "github.com/73ai/openbotkit/source/twitter/client"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/73ai/openbotkit/config"
-	"github.com/73ai/openbotkit/provider"
-	"github.com/73ai/openbotkit/settings"
-	xclient "github.com/73ai/openbotkit/source/twitter/client"
 )
 
 type state int
 
 const (
-	stateBrowse        state = iota
+	stateBrowse state = iota
 	stateEdit
 	stateProfileSelect
 	stateProviderAuth
@@ -74,20 +74,20 @@ type modelsLoadedMsg struct {
 }
 
 type model struct {
-	svc      *settings.Service
-	rows     []row
-	expanded map[string]bool
-	cursor   int
-	state    state
-	form     *huh.Form
+	svc       *settings.Service
+	rows      []row
+	expanded  map[string]bool
+	cursor    int
+	state     state
+	form      *huh.Form
 	editField *settings.Field
-	editStr  *string
-	editBool *bool
-	flash    string
-	viewport viewport.Model
-	width    int
-	height   int
-	ready    bool
+	editStr   *string
+	editBool  *bool
+	flash     string
+	viewport  viewport.Model
+	width     int
+	height    int
+	ready     bool
 
 	// Wizard state
 	wizardProfile   *string
@@ -176,6 +176,9 @@ func (m model) updateBrowse(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.viewport.SetContent(m.renderTree())
 		return m, nil
 
+	case telegramLoginDoneMsg:
+		return m.handleTelegramLoginResult(msg)
+
 	case backupTriggeredMsg:
 		if msg.err != nil {
 			m.flash = fmt.Sprintf("Backup failed: %v", msg.err)
@@ -248,6 +251,11 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 		// X login wizard
 		if f.Key == "x.auth_status" {
 			return m.enterXLogin()
+		}
+
+		// Telegram login runs the QR flow in a browser, so hand over the terminal.
+		if f.Key == "telegram.auth_status" {
+			return m.enterTelegramLogin()
 		}
 
 		// Backup wizard — only when not yet configured.

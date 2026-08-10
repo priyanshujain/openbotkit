@@ -90,11 +90,11 @@ type SystemBlock struct {
 
 // ChatRequest is the input to Provider.Chat and Provider.StreamChat.
 type ChatRequest struct {
-	Model        string        `json:"model"`
-	System       string        `json:"system,omitempty"`
-	SystemBlocks []SystemBlock `json:"system_blocks,omitempty"`
-	Messages     []Message     `json:"messages"`
-	Tools        []Tool        `json:"tools,omitempty"`
+	Model           string        `json:"model"`
+	System          string        `json:"system,omitempty"`
+	SystemBlocks    []SystemBlock `json:"system_blocks,omitempty"`
+	Messages        []Message     `json:"messages"`
+	Tools           []Tool        `json:"tools,omitempty"`
 	MaxTokens       int           `json:"max_tokens,omitempty"`
 	DisableThinking bool          `json:"disable_thinking,omitempty"`
 }

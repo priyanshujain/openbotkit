@@ -18,9 +18,9 @@ const (
 )
 
 type ServiceConfig struct {
-	Name       string            // service name, e.g. "daemon" or "server"
+	Name       string // service name, e.g. "daemon" or "server"
 	BinaryPath string
-	Args       []string          // command arguments, e.g. ["service", "run"]
+	Args       []string // command arguments, e.g. ["service", "run"]
 	LogPath    string
 	Env        map[string]string // environment variables to set
 }

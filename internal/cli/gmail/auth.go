@@ -8,10 +8,10 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/charmbracelet/huh"
 	"github.com/73ai/openbotkit/config"
 	"github.com/73ai/openbotkit/internal/tty"
 	"github.com/73ai/openbotkit/oauth/google"
+	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
 
@@ -221,7 +221,7 @@ func authInteractiveNewAccount(ctx context.Context, gp *google.Google) error {
 			huh.NewMultiSelect[string]().
 				Title("Select access to enable (space to toggle, enter to confirm)").
 				Options(options...).
-				Height(len(availableScopeChoices)+2).
+				Height(len(availableScopeChoices) + 2).
 				Value(&selectedScopes),
 		),
 	).Run()
@@ -303,9 +303,9 @@ func authInteractiveManage(ctx context.Context, gp *google.Google, accounts []st
 	err = huh.NewForm(
 		huh.NewGroup(
 			huh.NewMultiSelect[string]().
-				Title("Manage access for "+action+" (space to toggle, enter to confirm)").
+				Title("Manage access for " + action + " (space to toggle, enter to confirm)").
 				Options(options...).
-				Height(len(availableScopeChoices)+2).
+				Height(len(availableScopeChoices) + 2).
 				Value(&selectedScopes),
 		),
 	).Run()

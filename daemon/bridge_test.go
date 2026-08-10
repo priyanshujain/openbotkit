@@ -43,6 +43,14 @@ func TestDaemonOption_SkipWhatsApp(t *testing.T) {
 	}
 }
 
+func TestDaemonOption_SkipTelegram(t *testing.T) {
+	cfg := config.Default()
+	d := New(cfg, WithSkipTelegram())
+	if !d.skipTelegram {
+		t.Fatal("expected skipTelegram to be true")
+	}
+}
+
 func TestDaemonOption_SkipIMessage(t *testing.T) {
 	cfg := config.Default()
 	d := New(cfg, WithSkipIMessage())

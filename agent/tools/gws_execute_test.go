@@ -860,8 +860,8 @@ func TestGWSExecute_FlagsBooleanBare(t *testing.T) {
 	input, _ := json.Marshal(map[string]any{
 		"command": "calendar +agenda",
 		"flags": map[string]any{
-			"today":    true,
-			"verbose":  false,
+			"today":   true,
+			"verbose": false,
 		},
 	})
 	_, err := tool.Execute(context.Background(), input)

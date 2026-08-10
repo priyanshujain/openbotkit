@@ -9,6 +9,7 @@ import (
 var includePatterns = []string{
 	"*/data.db",
 	"whatsapp/session.db",
+	"telegram/session.json",
 	"config.yaml",
 	"env",
 	"ngrok.yml",

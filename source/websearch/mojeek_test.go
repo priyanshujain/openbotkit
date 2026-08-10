@@ -133,9 +133,9 @@ func TestMojeekRegionCookies(t *testing.T) {
 
 func TestRegionToCookies(t *testing.T) {
 	tests := []struct {
-		region     string
-		wantArc    string
-		wantLb     string
+		region  string
+		wantArc string
+		wantLb  string
 	}{
 		{"us-en", "us", "en"},
 		{"de-de", "de", "de"},

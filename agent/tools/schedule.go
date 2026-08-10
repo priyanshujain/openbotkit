@@ -92,7 +92,7 @@ func (t *CreateScheduleTool) InputSchema() json.RawMessage {
 			},
 			"trigger_source": {
 				"type": "string",
-				"enum": ["gmail", "whatsapp", "imessage", "applenotes"],
+				"enum": ["gmail", "whatsapp", "telegram", "imessage", "applenotes"],
 				"description": "Data source to watch (for reactive type)"
 			},
 			"trigger_query": {

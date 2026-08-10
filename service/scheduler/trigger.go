@@ -13,11 +13,12 @@ var triggerTemplates = map[string]string{
 	"whatsapp":   `SELECT id, message_id, sender_name, text, timestamp FROM whatsapp_messages WHERE id > ? AND (%s) ORDER BY id LIMIT 50`,
 	"imessage":   `SELECT id, guid, sender_id, text, date_utc FROM imessage_messages WHERE id > ? AND (%s) ORDER BY id LIMIT 50`,
 	"applenotes": `SELECT id, title, folder, modified_at FROM applenotes_notes WHERE id > ? AND (%s) ORDER BY id LIMIT 50`,
+	"telegram":   `SELECT id, message_id, sender_name, text, timestamp FROM telegram_messages WHERE id > ? AND (%s) ORDER BY id LIMIT 50`,
 }
 
 func ValidateTriggerSource(source string) error {
 	if _, ok := triggerTemplates[source]; !ok {
-		return fmt.Errorf("unknown trigger source %q; supported: gmail, whatsapp, imessage, applenotes", source)
+		return fmt.Errorf("unknown trigger source %q; supported: gmail, whatsapp, telegram, imessage, applenotes", source)
 	}
 	return nil
 }
@@ -28,6 +29,7 @@ var allowedColumns = map[string]map[string]bool{
 	"whatsapp":   {"MESSAGE_ID": true, "SENDER_NAME": true, "TEXT": true, "TIMESTAMP": true},
 	"imessage":   {"GUID": true, "SENDER_ID": true, "TEXT": true, "DATE_UTC": true},
 	"applenotes": {"TITLE": true, "FOLDER": true, "MODIFIED_AT": true},
+	"telegram":   {"MESSAGE_ID": true, "SENDER_NAME": true, "TEXT": true, "TIMESTAMP": true},
 }
 
 // allowedKeywords are SQL keywords permitted in trigger WHERE clauses.

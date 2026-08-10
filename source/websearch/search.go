@@ -80,9 +80,9 @@ func (w *WebSearch) searchWithEngines(ctx context.Context, query string, opts Se
 	}
 
 	var (
-		mu         sync.Mutex
-		collected  []engineResult
-		lastErr    error
+		mu        sync.Mutex
+		collected []engineResult
+		lastErr   error
 	)
 
 	g, gctx := errgroup.WithContext(ctx)

@@ -19,7 +19,7 @@ const (
 type engineState int
 
 const (
-	stateHealthy  engineState = iota
+	stateHealthy engineState = iota
 	stateUnhealthy
 	stateHalfOpen // cooldown expired, allow one probe
 )

@@ -21,10 +21,10 @@ func (c *Client) GetTweet(ctx context.Context, tweetID string) (json.RawMessage,
 
 func (c *Client) CreateTweet(ctx context.Context, text string, replyToID string) (json.RawMessage, error) {
 	vars := map[string]any{
-		"tweet_text":               text,
-		"dark_request":             false,
-		"media":                    map[string]any{"media_entities": []any{}, "possibly_sensitive": false},
-		"semantic_annotation_ids":  []any{},
+		"tweet_text":              text,
+		"dark_request":            false,
+		"media":                   map[string]any{"media_entities": []any{}, "possibly_sensitive": false},
+		"semantic_annotation_ids": []any{},
 	}
 	if replyToID != "" {
 		vars["reply"] = map[string]any{

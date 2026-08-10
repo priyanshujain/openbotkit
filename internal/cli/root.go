@@ -10,13 +10,15 @@ import (
 	financecli "github.com/73ai/openbotkit/internal/cli/finance"
 	"github.com/73ai/openbotkit/internal/cli/gmail"
 	historycli "github.com/73ai/openbotkit/internal/cli/history"
-	learningscli "github.com/73ai/openbotkit/internal/cli/learnings"
 	imessagecli "github.com/73ai/openbotkit/internal/cli/imessage"
+	learningscli "github.com/73ai/openbotkit/internal/cli/learnings"
 	memorycli "github.com/73ai/openbotkit/internal/cli/memory"
 	slackcli "github.com/73ai/openbotkit/internal/cli/slack"
+	telegramcli "github.com/73ai/openbotkit/internal/cli/telegram"
 	websearchcli "github.com/73ai/openbotkit/internal/cli/websearch"
 	whatsappcli "github.com/73ai/openbotkit/internal/cli/whatsapp"
 	xcli "github.com/73ai/openbotkit/internal/cli/x"
+	telegramsrc "github.com/73ai/openbotkit/source/telegram"
 	"github.com/spf13/cobra"
 )
 
@@ -37,6 +39,9 @@ var versionCmd = &cobra.Command{
 }
 
 func init() {
+	// source packages cannot import this one, so push the stamped version out.
+	telegramsrc.SetAppVersion(Version)
+
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(applenotescli.Cmd)
 	rootCmd.AddCommand(backupcli.Cmd)
@@ -49,6 +54,7 @@ func init() {
 	rootCmd.AddCommand(learningscli.Cmd)
 	rootCmd.AddCommand(memorycli.Cmd)
 	rootCmd.AddCommand(slackcli.Cmd)
+	rootCmd.AddCommand(telegramcli.Cmd)
 	rootCmd.AddCommand(websearchcli.Cmd)
 	rootCmd.AddCommand(whatsappcli.Cmd)
 	rootCmd.AddCommand(xcli.Cmd)

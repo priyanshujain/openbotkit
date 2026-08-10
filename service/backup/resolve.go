@@ -22,13 +22,13 @@ type GoogleClientConfig struct {
 
 // ResolveBackendOpts holds the dependencies needed to resolve a backup backend.
 type ResolveBackendOpts struct {
-	ResolveCred   CredentialResolver
-	GoogleClient  GoogleClientFactory
-	BackupDest    string
-	R2Bucket      string
-	R2Endpoint    string
-	R2AccessRef   string
-	R2SecretRef   string
+	ResolveCred    CredentialResolver
+	GoogleClient   GoogleClientFactory
+	BackupDest     string
+	R2Bucket       string
+	R2Endpoint     string
+	R2AccessRef    string
+	R2SecretRef    string
 	GDriveFolderID string
 }
 

@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/huh"
 	"github.com/73ai/openbotkit/agent/audit"
 	"github.com/73ai/openbotkit/config"
 	"github.com/73ai/openbotkit/internal/browser/cookies"
 	"github.com/73ai/openbotkit/internal/tty"
 	"github.com/73ai/openbotkit/source/twitter/client"
+	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
 
@@ -150,7 +150,6 @@ func printSafariFDAInstructions() {
 	fmt.Println("  3. Restart your terminal and try again")
 	fmt.Println()
 }
-
 
 var authLogoutCmd = &cobra.Command{
 	Use:   "logout",

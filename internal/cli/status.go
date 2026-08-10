@@ -17,8 +17,9 @@ import (
 	gmailsrc "github.com/73ai/openbotkit/source/gmail"
 	imsrc "github.com/73ai/openbotkit/source/imessage"
 	slacksrc "github.com/73ai/openbotkit/source/slack"
-	wasrc "github.com/73ai/openbotkit/source/whatsapp"
+	tgsrc "github.com/73ai/openbotkit/source/telegram"
 	wssrc "github.com/73ai/openbotkit/source/websearch"
+	wasrc "github.com/73ai/openbotkit/source/whatsapp"
 	"github.com/73ai/openbotkit/store"
 	"github.com/spf13/cobra"
 )
@@ -80,6 +81,9 @@ var statusCmd = &cobra.Command{
 		sl := slacksrc.New(slacksrc.Config{Slack: cfg.Slack})
 		source.Register(sl)
 
+		tg := tgsrc.New(tgsrc.Config{SessionPath: cfg.TelegramSessionPath()})
+		source.Register(tg)
+
 		ctx := context.Background()
 
 		type sourceStatus struct {
@@ -139,6 +143,15 @@ var statusCmd = &cobra.Command{
 				})
 				if db != nil {
 					wssrc.Migrate(db)
+				}
+			case "telegram":
+				dsn := cfg.TelegramDataDSN()
+				db, _ = store.Open(store.Config{
+					Driver: cfg.Telegram.Storage.Driver,
+					DSN:    dsn,
+				})
+				if db != nil {
+					tgsrc.Migrate(db)
 				}
 			}
 

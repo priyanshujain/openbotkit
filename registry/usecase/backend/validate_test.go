@@ -16,14 +16,14 @@ func TestValidateRejectsInvalidDomain(t *testing.T) {
 
 func TestValidateAcceptsValidRequest(t *testing.T) {
 	req := &useCaseRequest{
-		Title:       "Test",
-		Description: "Test",
-		Domain:      "Sales",
-		RiskLevel:   "low",
+		Title:        "Test",
+		Description:  "Test",
+		Domain:       "Sales",
+		RiskLevel:    "low",
 		ROIPotential: "high",
-		Status:      "draft",
-		ImplStatus:  "evaluating",
-		Visibility:  "public",
+		Status:       "draft",
+		ImplStatus:   "evaluating",
+		Visibility:   "public",
 	}
 	err := validateUseCaseRequest(req)
 	if err != nil {

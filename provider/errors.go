@@ -11,9 +11,9 @@ type ErrorKind int
 
 const (
 	ErrorPermanent     ErrorKind = iota // everything else (zero value = safe default)
-	ErrorRetryable                     // 429, 5xx
-	ErrorAuth                          // 401, 403
-	ErrorContextWindow                 // 400 + "context" in message
+	ErrorRetryable                      // 429, 5xx
+	ErrorAuth                           // 401, 403
+	ErrorContextWindow                  // 400 + "context" in message
 )
 
 type APIError struct {

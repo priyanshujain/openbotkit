@@ -24,6 +24,8 @@ var builtinSkills = map[string]SkillMeta{
 	"email-send":      {Scopes: []string{"https://www.googleapis.com/auth/gmail.modify"}, Write: true},
 	"whatsapp-read":   {RequiresAuth: "whatsapp"},
 	"whatsapp-send":   {RequiresAuth: "whatsapp", Write: true},
+	"telegram-read":   {RequiresAuth: "telegram"},
+	"telegram-send":   {RequiresAuth: "telegram", Write: true},
 	"slack-thread":    {RequiresAuth: "slack", Write: true},
 	"history-read":    {},
 	"memory-save":     {},

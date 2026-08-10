@@ -73,7 +73,7 @@ func (w *WhatsApp) Login(ctx context.Context) error {
 		}
 	}
 
-	return ServeQR(ctx, client, ":8085", dataDB)
+	return ServeQR(ctx, client, "127.0.0.1:8085", dataDB)
 }
 
 func (w *WhatsApp) Logout(ctx context.Context) error {

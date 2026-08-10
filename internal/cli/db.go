@@ -12,11 +12,12 @@ import (
 var dbCmd = &cobra.Command{
 	Use:   "db <source> <sql>",
 	Short: "Run a SQL query against a data source",
-	Long:  "Execute a read-only SQL query against one of the data sources (gmail, whatsapp, history, user_memory, applenotes).",
+	Long:  "Execute a read-only SQL query against one of the data sources (gmail, whatsapp, telegram, history, user_memory, applenotes).",
 	Example: `  obk db gmail "SELECT count(*) FROM emails"
   obk db whatsapp "SELECT * FROM messages ORDER BY timestamp DESC LIMIT 5"
+  obk db telegram "SELECT count(*) FROM telegram_messages"
   obk db user_memory "SELECT * FROM memories"`,
-	Args:  cobra.ExactArgs(2),
+	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		source := args[0]
 		query := args[1]

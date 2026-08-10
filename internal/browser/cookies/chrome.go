@@ -13,8 +13,8 @@ import (
 	"runtime"
 	"strings"
 
-	_ "modernc.org/sqlite"
 	"golang.org/x/crypto/pbkdf2"
+	_ "modernc.org/sqlite"
 )
 
 const (

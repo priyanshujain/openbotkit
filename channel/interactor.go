@@ -15,6 +15,6 @@ func NewInteractor(ch Channel) *Interactor {
 	return &Interactor{ch: ch}
 }
 
-func (i *Interactor) Notify(msg string) error                       { return i.ch.Send(msg) }
-func (i *Interactor) NotifyLink(text, url string) error             { return i.ch.SendLink(text, url) }
-func (i *Interactor) RequestApproval(desc string) (bool, error)     { return i.ch.RequestApproval(desc) }
+func (i *Interactor) Notify(msg string) error                   { return i.ch.Send(msg) }
+func (i *Interactor) NotifyLink(text, url string) error         { return i.ch.SendLink(text, url) }
+func (i *Interactor) RequestApproval(desc string) (bool, error) { return i.ch.RequestApproval(desc) }

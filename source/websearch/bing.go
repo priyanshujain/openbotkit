@@ -88,7 +88,7 @@ func (b *Bing) Search(ctx context.Context, query string, opts SearchOptions) ([]
 			Title:   title,
 			URL:     href,
 			Snippet: snippet,
-			Source:   "bing",
+			Source:  "bing",
 		})
 	})
 

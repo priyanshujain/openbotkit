@@ -13,8 +13,8 @@ import (
 )
 
 var syncCmd = &cobra.Command{
-	Use:     "sync",
-	Short:   "Start WhatsApp message sync daemon",
+	Use:   "sync",
+	Short: "Start WhatsApp message sync daemon",
 	Example: `  obk whatsapp sync
   obk whatsapp sync --account personal`,
 	RunE: func(cmd *cobra.Command, args []string) error {

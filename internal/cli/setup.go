@@ -9,30 +9,30 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/huh"
 	"github.com/73ai/openbotkit/config"
-	backupsvc "github.com/73ai/openbotkit/service/backup"
+	"github.com/73ai/openbotkit/internal/browser/cookies"
 	"github.com/73ai/openbotkit/internal/skills"
 	"github.com/73ai/openbotkit/internal/tty"
 	"github.com/73ai/openbotkit/oauth/google"
 	"github.com/73ai/openbotkit/provider"
-	"github.com/73ai/openbotkit/internal/browser/cookies"
 	"github.com/73ai/openbotkit/remote"
-	ansrc "github.com/73ai/openbotkit/source/applenotes"
-	xclient "github.com/73ai/openbotkit/source/twitter/client"
+	backupsvc "github.com/73ai/openbotkit/service/backup"
 	contactsrc "github.com/73ai/openbotkit/service/contacts"
+	ansrc "github.com/73ai/openbotkit/source/applenotes"
 	imsrc "github.com/73ai/openbotkit/source/imessage"
 	slacksrc "github.com/73ai/openbotkit/source/slack"
 	"github.com/73ai/openbotkit/source/slack/desktop"
+	xclient "github.com/73ai/openbotkit/source/twitter/client"
 	"github.com/73ai/openbotkit/store"
+	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
 
 var gwsServices = []string{"calendar", "drive", "docs", "sheets", "tasks", "people"}
 
 var setupCmd = &cobra.Command{
-	Use:   "setup",
-	Short: "Guided first-time setup for OpenBotKit",
+	Use:     "setup",
+	Short:   "Guided first-time setup for OpenBotKit",
 	Example: `  obk setup`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := tty.RequireInteractive("configure manually with 'obk config' and 'obk gmail auth login'"); err != nil {
@@ -64,7 +64,8 @@ var setupCmd = &cobra.Command{
 		var sources []string
 		sourceOptions := []huh.Option[string]{
 			huh.NewOption("LLM Models (for obk chat)", "models"),
-			huh.NewOption("Telegram Bot", "telegram"),
+			huh.NewOption("Telegram Bot (talk to your assistant)", "telegram"),
+			huh.NewOption("Telegram (your account, read + send messages)", "telegram_source"),
 			huh.NewOption("Gmail", "gmail"),
 			huh.NewOption("WhatsApp", "whatsapp"),
 			huh.NewOption("Google Calendar", "calendar"),
@@ -182,6 +183,10 @@ var setupCmd = &cobra.Command{
 				}
 				fmt.Println("\n  WhatsApp requires QR code login.")
 				fmt.Println("  Run after setup: obk whatsapp auth login")
+			case "telegram_source":
+				if err := setupTelegramSource(cfg); err != nil {
+					return err
+				}
 			case "x":
 				if err := setupX(cfg); err != nil {
 					return err
@@ -261,6 +266,8 @@ var setupCmd = &cobra.Command{
 				fmt.Println("    - Slack is ready! Try: obk slack channels")
 			case "telegram":
 				fmt.Println("    - Telegram bot is ready! Send it a message.")
+			case "telegram_source":
+				fmt.Println("    - Run: obk telegram auth login")
 			case "backup":
 				fmt.Println("    - Backup configured! Run `obk backup now` for your first backup.")
 			}
@@ -763,7 +770,6 @@ func setupX(cfg *config.Config) error {
 	fmt.Printf("  Authenticated with X (from %s)!\n", browser)
 	return nil
 }
-
 
 func setupSlack(cfg *config.Config) error {
 	fmt.Println("\n  -- Slack Setup --")

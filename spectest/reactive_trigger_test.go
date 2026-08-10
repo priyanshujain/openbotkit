@@ -292,4 +292,3 @@ func TestSpec_ReactiveNoMatchDoesNotFire(t *testing.T) {
 		t.Errorf("expected no messages, got %d", len(msgs))
 	}
 }
-

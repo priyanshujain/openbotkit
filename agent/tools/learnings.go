@@ -42,8 +42,10 @@ func NewLearningSaveTool(deps LearningsDeps) *LearningSaveTool {
 	return &LearningSaveTool{deps: deps}
 }
 
-func (t *LearningSaveTool) Name() string        { return "learnings_save" }
-func (t *LearningSaveTool) Description() string { return "Save learnings as bullet points under a topic" }
+func (t *LearningSaveTool) Name() string { return "learnings_save" }
+func (t *LearningSaveTool) Description() string {
+	return "Save learnings as bullet points under a topic"
+}
 func (t *LearningSaveTool) InputSchema() json.RawMessage {
 	return json.RawMessage(`{
 		"type": "object",
@@ -260,8 +262,8 @@ type trackingSaveTool struct {
 	slugs []string
 }
 
-func (t *trackingSaveTool) Name() string               { return t.inner.Name() }
-func (t *trackingSaveTool) Description() string         { return t.inner.Description() }
+func (t *trackingSaveTool) Name() string                 { return t.inner.Name() }
+func (t *trackingSaveTool) Description() string          { return t.inner.Description() }
 func (t *trackingSaveTool) InputSchema() json.RawMessage { return t.inner.InputSchema() }
 func (t *trackingSaveTool) Execute(ctx context.Context, input json.RawMessage) (string, error) {
 	var in learningSaveInput

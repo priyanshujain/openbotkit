@@ -225,8 +225,8 @@ gws schema calendar.<resource>.<method>
 
 type autoApproveInteractor struct{}
 
-func (a *autoApproveInteractor) Notify(_ string) error               { return nil }
-func (a *autoApproveInteractor) NotifyLink(_, _ string) error        { return nil }
+func (a *autoApproveInteractor) Notify(_ string) error                  { return nil }
+func (a *autoApproveInteractor) NotifyLink(_, _ string) error           { return nil }
 func (a *autoApproveInteractor) RequestApproval(_ string) (bool, error) { return true, nil }
 
 type allScopesChecker struct{}

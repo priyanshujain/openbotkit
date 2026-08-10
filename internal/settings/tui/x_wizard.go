@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/huh"
 	"github.com/73ai/openbotkit/agent/audit"
 	"github.com/73ai/openbotkit/config"
 	"github.com/73ai/openbotkit/internal/browser/cookies"
 	xclient "github.com/73ai/openbotkit/source/twitter/client"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/huh"
 )
 
 // --- X login wizard: browser select → spinner → save ---
@@ -135,7 +135,6 @@ func (m model) exitXWizard(flash string) (model, tea.Cmd) {
 	}
 	return m, nil
 }
-
 
 func logXAudit(toolName, input, output, errMsg string) {
 	audit.LogQuick(config.AuditJSONLPath(), "settings", toolName, input, output, errMsg)

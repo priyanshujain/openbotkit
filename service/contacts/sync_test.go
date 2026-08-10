@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
-	wasrc "github.com/73ai/openbotkit/source/whatsapp"
 	gmailsrc "github.com/73ai/openbotkit/source/gmail"
 	imsrc "github.com/73ai/openbotkit/source/imessage"
+	wasrc "github.com/73ai/openbotkit/source/whatsapp"
 	"github.com/73ai/openbotkit/store"
 )
 

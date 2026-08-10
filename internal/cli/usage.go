@@ -18,7 +18,7 @@ var usageCmd = &cobra.Command{
 	Short: "Show LLM token usage and estimated costs",
 	Example: `  obk usage
   obk usage --since 2025-03-01 --json`,
-	RunE:  runUsageDaily,
+	RunE: runUsageDaily,
 }
 
 var usageDailyCmd = &cobra.Command{
@@ -26,7 +26,7 @@ var usageDailyCmd = &cobra.Command{
 	Short: "Show daily usage breakdown",
 	Example: `  obk usage daily --since 2025-03-01
   obk usage daily --model claude-sonnet-4-6 --json`,
-	RunE:  runUsageDaily,
+	RunE: runUsageDaily,
 }
 
 var usageMonthlyCmd = &cobra.Command{
@@ -34,7 +34,7 @@ var usageMonthlyCmd = &cobra.Command{
 	Short: "Show monthly usage breakdown",
 	Example: `  obk usage monthly
   obk usage monthly --json`,
-	RunE:  runUsageMonthly,
+	RunE: runUsageMonthly,
 }
 
 var (

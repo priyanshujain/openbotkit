@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/73ai/openbotkit/channel/tghtml"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 type TelegramPusher struct {

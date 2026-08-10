@@ -27,12 +27,12 @@ type Field struct {
 	Description string
 	Type        FieldType
 	Options     []Option
-	OptionsFunc func(*config.Config) []Option   // dynamic options, overrides Options
+	OptionsFunc func(*config.Config) []Option // dynamic options, overrides Options
 	Get         func(*config.Config) string
 	Set         func(*config.Config, string) error
 	Validate    func(string) error
-	AfterSet    func(*Service) string           // optional post-set message
-	ReadOnly    func(*config.Config) bool       // if true, field can't be edited
+	AfterSet    func(*Service) string     // optional post-set message
+	ReadOnly    func(*config.Config) bool // if true, field can't be edited
 }
 
 type Category struct {
@@ -100,7 +100,7 @@ func New(cfg *config.Config, opts ...ServiceOption) *Service {
 	return s
 }
 
-func (s *Service) Tree() []Node { return s.tree }
+func (s *Service) Tree() []Node           { return s.tree }
 func (s *Service) Config() *config.Config { return s.cfg }
 
 func (s *Service) RebuildTree() {

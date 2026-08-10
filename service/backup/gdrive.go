@@ -251,4 +251,3 @@ func escapeDriveQuery(s string) string {
 }
 
 var _ Backend = (*GDriveBackend)(nil)
-

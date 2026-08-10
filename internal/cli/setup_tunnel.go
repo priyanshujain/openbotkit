@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/huh"
 	"github.com/73ai/openbotkit/config"
+	"github.com/charmbracelet/huh"
 )
 
 var errSetupSkipped = errors.New("skipped by user")

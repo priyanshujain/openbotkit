@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/huh"
 	"github.com/73ai/openbotkit/config"
 	"github.com/73ai/openbotkit/provider"
 	_ "github.com/73ai/openbotkit/provider/anthropic"
@@ -17,6 +16,7 @@ import (
 	_ "github.com/73ai/openbotkit/provider/openai"
 	_ "github.com/73ai/openbotkit/provider/openrouter"
 	_ "github.com/73ai/openbotkit/provider/zai"
+	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
 
@@ -99,8 +99,8 @@ var vertexRegions = []huh.Option[string]{
 }
 
 var setupModelsCmd = &cobra.Command{
-	Use:   "models",
-	Short: "Configure LLM model providers",
+	Use:     "models",
+	Short:   "Configure LLM model providers",
 	Example: `  obk setup models`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load()

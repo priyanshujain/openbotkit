@@ -41,10 +41,10 @@ type AgentRunner func(ctx context.Context, task string) (string, error)
 
 type ScheduledTaskWorker struct {
 	river.WorkerDefaults[ScheduledTaskArgs]
-	Cfg           *config.Config
-	MakePusher    PusherFactory
-	RunAgentFunc  AgentRunner
-	TasksDB       *store.DB // optional: for recording task results
+	Cfg          *config.Config
+	MakePusher   PusherFactory
+	RunAgentFunc AgentRunner
+	TasksDB      *store.DB // optional: for recording task results
 }
 
 func (w *ScheduledTaskWorker) Work(ctx context.Context, job *river.Job[ScheduledTaskArgs]) error {

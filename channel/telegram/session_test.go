@@ -13,9 +13,9 @@ import (
 
 	"github.com/73ai/openbotkit/agent/tools"
 	"github.com/73ai/openbotkit/config"
-	"github.com/73ai/openbotkit/service/memory"
 	"github.com/73ai/openbotkit/provider"
 	historysrc "github.com/73ai/openbotkit/service/history"
+	"github.com/73ai/openbotkit/service/memory"
 )
 
 type stubProvider struct{}
@@ -796,7 +796,7 @@ func TestSessionManager_IsAgentRunning(t *testing.T) {
 		cfg: cfg, channel: ch, provider: bp, model: "test",
 		fastProvider: bp, fastModel: "test",
 		nanoProvider: bp, nanoModel: "test",
-		taskTracker:  newTaskTracker(),
+		taskTracker: newTaskTracker(),
 	}
 
 	if sm.IsAgentRunning() {
@@ -830,7 +830,7 @@ func TestSessionManager_Kill(t *testing.T) {
 		cfg: cfg, channel: ch, provider: bp, model: "test",
 		fastProvider: bp, fastModel: "test",
 		nanoProvider: bp, nanoModel: "test",
-		taskTracker:  newTaskTracker(),
+		taskTracker: newTaskTracker(),
 	}
 
 	done := make(chan struct{})
@@ -883,7 +883,7 @@ func TestSessionManager_HandleMessageKilled(t *testing.T) {
 		cfg: cfg, channel: ch, provider: bp, model: "test",
 		fastProvider: bp, fastModel: "test",
 		nanoProvider: bp, nanoModel: "test",
-		taskTracker:  newTaskTracker(),
+		taskTracker: newTaskTracker(),
 	}
 
 	done := make(chan struct{})

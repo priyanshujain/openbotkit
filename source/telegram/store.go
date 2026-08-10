@@ -286,6 +286,17 @@ func ListUsers(db *store.DB, query string, limit int) ([]User, error) {
 	return users, rows.Err()
 }
 
+// parseDay turns a YYYY-MM-DD filter into a timestamp. Comparing the raw
+// string against a stored RFC3339 timestamp looks like it works but drops
+// every message after midnight on the final day.
+func parseDay(value string) (time.Time, error) {
+	day, err := time.Parse("2006-01-02", value)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("invalid date %q (want YYYY-MM-DD)", value)
+	}
+	return day.UTC(), nil
+}
+
 const messageColumns = `message_id, chat_id, sender_id, sender_name, text, timestamp,
 	media_type, reply_to_id, is_outgoing, edit_date`
 
@@ -316,12 +327,20 @@ func ListMessages(db *store.DB, opts ListOptions) ([]Message, error) {
 		args = append(args, opts.ChatID)
 	}
 	if opts.After != "" {
+		day, err := parseDay(opts.After)
+		if err != nil {
+			return nil, fmt.Errorf("after: %w", err)
+		}
 		conditions = append(conditions, "timestamp >= ?")
-		args = append(args, opts.After)
+		args = append(args, day)
 	}
 	if opts.Before != "" {
-		conditions = append(conditions, "timestamp <= ?")
-		args = append(args, opts.Before)
+		day, err := parseDay(opts.Before)
+		if err != nil {
+			return nil, fmt.Errorf("before: %w", err)
+		}
+		conditions = append(conditions, "timestamp < ?")
+		args = append(args, day.AddDate(0, 0, 1))
 	}
 
 	where := ""

@@ -93,6 +93,52 @@ func TestListMessagesDateFilters(t *testing.T) {
 	}
 }
 
+// --before is a date, and a date means the whole day. Comparing it against a
+// stored timestamp as a string silently drops everything after midnight.
+func TestListMessagesBeforeIncludesTheWholeDay(t *testing.T) {
+	db := testDB(t)
+
+	ts := time.Date(2026, 2, 1, 12, 0, 0, 0, time.UTC)
+	if err := SaveMessage(db, &Message{MessageID: 1, ChatID: 100, Text: "noon", Timestamp: ts}); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	got, err := ListMessages(db, ListOptions{Before: "2026-02-01"})
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("expected the midday message to be within --before 2026-02-01, got %d", len(got))
+	}
+
+	got, err = ListMessages(db, ListOptions{After: "2026-02-01", Before: "2026-02-01"})
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("a single-day range should return that day, got %d", len(got))
+	}
+
+	got, err = ListMessages(db, ListOptions{Before: "2026-01-31"})
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("--before must stay exclusive of later days, got %d", len(got))
+	}
+}
+
+func TestListMessagesRejectsBadDates(t *testing.T) {
+	db := testDB(t)
+
+	if _, err := ListMessages(db, ListOptions{After: "yesterday"}); err == nil {
+		t.Fatal("expected an error for an unparseable --after")
+	}
+	if _, err := ListMessages(db, ListOptions{Before: "01/02/2026"}); err == nil {
+		t.Fatal("expected an error for an unparseable --before")
+	}
+}
+
 func TestSearchMessages(t *testing.T) {
 	db := testDB(t)
 

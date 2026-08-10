@@ -1,9 +1,14 @@
 package telegram
 
 import (
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
+
+	"github.com/gotd/td/tgerr"
 )
 
 func TestNewClientCreatesSessionDir(t *testing.T) {
@@ -55,6 +60,55 @@ func TestHasSession(t *testing.T) {
 	}
 	if !HasSession(path) {
 		t.Fatal("non-empty file should report a session")
+	}
+}
+
+func TestLogoutWithoutSession(t *testing.T) {
+	client, err := NewClient(filepath.Join(t.TempDir(), "session.json"), 1, "hash", nil)
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+	if err := client.Logout(context.Background()); err == nil {
+		t.Fatal("expected an error when there is nothing to log out of")
+	}
+}
+
+// A logout that never reached the server must leave the session file alone:
+// the device stays authorised, so throwing away the local half would leave the
+// user with no way to revoke it.
+func TestLogoutKeepsSessionWhenRevocationFails(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "session.json")
+	if err := os.WriteFile(path, []byte("not a session"), 0600); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	client, err := NewClient(path, 1, "hash", nil)
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := client.Logout(ctx); err == nil {
+		t.Fatal("expected the failed revocation to be reported")
+	}
+	if !HasSession(path) {
+		t.Fatal("session file removed even though the server was never told")
+	}
+}
+
+func TestSessionAlreadyRevoked(t *testing.T) {
+	for _, code := range []string{"AUTH_KEY_UNREGISTERED", "SESSION_REVOKED", "USER_DEACTIVATED"} {
+		if !sessionAlreadyRevoked(tgerr.New(401, code)) {
+			t.Fatalf("%s should count as already revoked", code)
+		}
+	}
+	if sessionAlreadyRevoked(tgerr.New(420, "FLOOD_WAIT")) {
+		t.Fatal("a flood wait leaves the session alive")
+	}
+	if sessionAlreadyRevoked(errors.New("dial tcp: no route to host")) {
+		t.Fatal("a network failure leaves the session alive")
 	}
 }
 

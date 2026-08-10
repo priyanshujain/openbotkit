@@ -14,6 +14,7 @@ import (
 	"github.com/gotd/td/telegram"
 	"github.com/gotd/td/telegram/updates"
 	"github.com/gotd/td/tg"
+	"github.com/gotd/td/tgerr"
 	"golang.org/x/time/rate"
 
 	"github.com/73ai/openbotkit/provider"
@@ -170,17 +171,28 @@ func (c *Client) IsAuthenticated(ctx context.Context) (bool, *tg.User, error) {
 	return ok, self, nil
 }
 
-// Logout revokes the session server-side and removes the local session file.
+// Logout revokes the session server-side and only then removes the local
+// session file. Dropping the file on a failed revocation would leave the
+// device authorised on the account with nothing left to revoke it with.
 func (c *Client) Logout(ctx context.Context) error {
 	if !c.HasSession() {
 		return fmt.Errorf("not authenticated")
 	}
-	runErr := c.tg.Run(ctx, func(ctx context.Context) error {
+	err := c.tg.Run(ctx, func(ctx context.Context) error {
 		_, err := c.tg.API().AuthLogOut(ctx)
 		return err
 	})
+	if err != nil && !sessionAlreadyRevoked(err) {
+		return fmt.Errorf("revoke session: %w (the local session was left in place; try again when you are online)", err)
+	}
 	if err := os.Remove(c.sessionPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("remove session: %w", err)
 	}
-	return runErr
+	return nil
+}
+
+// sessionAlreadyRevoked reports whether the server considers the session dead
+// already, in which case deleting the local file is the whole job.
+func sessionAlreadyRevoked(err error) bool {
+	return tgerr.Is(err, "AUTH_KEY_UNREGISTERED", "SESSION_REVOKED", "USER_DEACTIVATED")
 }

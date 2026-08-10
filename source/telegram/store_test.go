@@ -158,6 +158,54 @@ func TestSearchMessages(t *testing.T) {
 	}
 }
 
+// % and _ are LIKE wildcards. A user searching for them means the characters.
+func TestSearchEscapesLikeWildcards(t *testing.T) {
+	db := testDB(t)
+
+	ts := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	for i, text := range []string{"50% off today", "discount 5000 off", "a_b", "axb"} {
+		if err := SaveMessage(db, &Message{MessageID: i + 1, ChatID: 100, Text: text, Timestamp: ts}); err != nil {
+			t.Fatalf("save: %v", err)
+		}
+	}
+
+	got, err := SearchMessages(db, "50% off", 10)
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(got) != 1 || got[0].Text != "50% off today" {
+		t.Fatalf("%% must be a literal, got %+v", got)
+	}
+
+	got, err = SearchMessages(db, "a_b", 10)
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(got) != 1 || got[0].Text != "a_b" {
+		t.Fatalf("_ must be a literal, got %+v", got)
+	}
+}
+func TestListUsersEscapesLikeWildcards(t *testing.T) {
+	db := testDB(t)
+
+	for _, u := range []*User{
+		{UserID: 1, FirstName: "a_b"},
+		{UserID: 2, FirstName: "axb"},
+	} {
+		if err := UpsertUser(db, u); err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+	}
+
+	got, err := ListUsers(db, "a_b", 10)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(got) != 1 || got[0].UserID != 1 {
+		t.Fatalf("expected only the literal match, got %+v", got)
+	}
+}
+
 func TestCountAndMessageExists(t *testing.T) {
 	db := testDB(t)
 

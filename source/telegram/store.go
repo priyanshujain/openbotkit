@@ -254,11 +254,12 @@ func ListUsers(db *store.DB, query string, limit int) ([]User, error) {
 	var rows *sql.Rows
 	var err error
 	if query != "" {
-		pattern := "%" + strings.ToLower(query) + "%"
+		pattern := likePattern(query)
 		rows, err = db.Query(
 			db.Rebind(`SELECT user_id, username, first_name, last_name, phone, access_hash, is_bot
 				FROM telegram_users
-				WHERE LOWER(username) LIKE ? OR LOWER(first_name) LIKE ? OR LOWER(last_name) LIKE ? OR phone LIKE ?
+				WHERE LOWER(username) LIKE ? ESCAPE '\' OR LOWER(first_name) LIKE ? ESCAPE '\'
+					OR LOWER(last_name) LIKE ? ESCAPE '\' OR phone LIKE ? ESCAPE '\'
 				ORDER BY first_name LIMIT ?`),
 			pattern, pattern, pattern, pattern, limit,
 		)
@@ -295,6 +296,14 @@ func parseDay(value string) (time.Time, error) {
 		return time.Time{}, fmt.Errorf("invalid date %q (want YYYY-MM-DD)", value)
 	}
 	return day.UTC(), nil
+}
+
+// likePattern builds a case-insensitive contains-pattern with the LIKE
+// wildcards escaped, so searching "50% off" cannot match "discount 5000 off".
+// Queries using it must add ESCAPE '\'.
+func likePattern(s string) string {
+	esc := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+	return "%" + esc.Replace(strings.ToLower(s)) + "%"
 }
 
 const messageColumns = `message_id, chat_id, sender_id, sender_name, text, timestamp,
@@ -370,11 +379,11 @@ func SearchMessages(db *store.DB, query string, limit int) ([]Message, error) {
 	if limit <= 0 {
 		limit = 50
 	}
-	pattern := "%" + strings.ToLower(query) + "%"
+	pattern := likePattern(query)
 
 	rows, err := db.Query(
 		db.Rebind(fmt.Sprintf(
-			"SELECT %s FROM telegram_messages WHERE LOWER(text) LIKE ? ORDER BY timestamp DESC LIMIT ?",
+			`SELECT %s FROM telegram_messages WHERE LOWER(text) LIKE ? ESCAPE '\' ORDER BY timestamp DESC LIMIT ?`,
 			messageColumns)),
 		pattern, limit,
 	)

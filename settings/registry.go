@@ -2,6 +2,7 @@ package settings
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -705,6 +706,8 @@ func IsTelegramConfigured() bool {
 	return telegramsrc.HasCredentials()
 }
 
+var apiHashPattern = regexp.MustCompile(`^[0-9a-fA-F]{32}$`)
+
 func ensureTelegram(c *config.Config) {
 	if c.Telegram == nil {
 		c.Telegram = &config.TelegramSourceConfig{}
@@ -788,6 +791,17 @@ func telegramSourceCategory(svc *Service) *Category {
 						return fmt.Errorf("store credential: %w", err)
 					}
 					c.Telegram.APIHashRef = telegramsrc.APIHashRef
+					return nil
+				},
+				Validate: func(v string) error {
+					if v == "" {
+						return nil
+					}
+					// Catch a truncated paste here rather than as an opaque
+					// MTProto error at login.
+					if !apiHashPattern.MatchString(strings.TrimSpace(v)) {
+						return fmt.Errorf("api_hash must be 32 hex characters")
+					}
 					return nil
 				},
 			}},

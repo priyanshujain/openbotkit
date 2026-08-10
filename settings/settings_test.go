@@ -1166,6 +1166,26 @@ func TestTelegramAPIIDValidation(t *testing.T) {
 	}
 }
 
+// A truncated paste should be caught here, not as an opaque MTProto error at
+// login.
+func TestTelegramAPIHashValidation(t *testing.T) {
+	cfg := config.Default()
+	svc := testService(cfg)
+
+	field := findField(svc, "telegram.api_hash")
+	if field == nil {
+		t.Fatal("telegram.api_hash field not found")
+	}
+	for _, bad := range []string{"0123456789abcdef", "0123456789abcdef0123456789abcdefff", "zzz3456789abcdef0123456789abcdef"} {
+		if err := svc.SetValue(field, bad); err == nil {
+			t.Fatalf("expected %q to be rejected", bad)
+		}
+	}
+	if err := svc.SetValue(field, "0123456789ABCDEF0123456789abcdef"); err != nil {
+		t.Fatalf("a valid api_hash was rejected: %v", err)
+	}
+}
+
 // A headless install configures Telegram through the environment, which no
 // config ref records. Calling that unconfigured blocks login on a setup that
 // works.

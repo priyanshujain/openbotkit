@@ -186,7 +186,8 @@ func WaitForSync(client *Client, maxWaitSec, quietPeriodSec int, dataDB ...*stor
 
 func ServeQR(ctx context.Context, client *Client, addr string, dataDB *store.DB) error {
 	if addr == "" {
-		addr = ":8085"
+		// Loopback only: the QR page is for this machine, not the LAN.
+		addr = "127.0.0.1:8085"
 	}
 
 	var mu sync.Mutex

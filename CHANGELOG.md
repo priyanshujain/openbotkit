@@ -3,6 +3,8 @@
 All notable changes to OpenBotKit are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.14.0] (2026-08-16)
+
 ## [0.13.0] (2026-07-29)
 
 ### Added
